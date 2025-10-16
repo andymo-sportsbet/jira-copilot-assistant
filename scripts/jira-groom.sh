@@ -604,13 +604,12 @@ main() {
         else
             info "Using default Fibonacci estimation (1, 2, 3, 5, 8, 13...)..."
             local estimation_output
-            estimation_output=$(estimate_story_points "$description_text" "$summary" 2>&1)
+            # Capture stdout (the number) and stderr (the analysis) separately
+            story_points=$(estimate_story_points "$description_text" "$summary" 2>/dev/null)
             
-            # Extract story points (last line of output)
-            story_points=$(echo "$estimation_output" | tail -n 1)
-            
-            # Extract analysis (everything except last line)
-            local analysis=$(echo "$estimation_output" | head -n -1)
+            # Re-run to get the analysis from stderr
+            local analysis
+            analysis=$(estimate_story_points "$description_text" "$summary" 2>&1 >/dev/null)
             
             if [[ -n "$analysis" ]]; then
                 echo "$analysis"
