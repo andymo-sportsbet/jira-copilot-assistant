@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/yourorg/jira-copilot-assistant/tree/main/docs
+    about: Check the documentation for setup, usage, and troubleshooting guides
+  - name: 💬 Slack Support
+    url: https://yourcompany.slack.com/channels/jira-automation
+    about: Ask questions and get help from the community
+  - name: 🎓 Training Materials
+    url: https://github.com/yourorg/jira-copilot-assistant/blob/main/docs/training-guide.md
+    about: Access training guides and hands-on exercises

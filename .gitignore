@@ -1,0 +1,52 @@
+# Environment variables with sensitive credentials
+.env
+
+# Temporary AI-generated files
+.temp/
+*.tmp
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS Finder thumbnails
+._*
+
+# macOS directories
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node modules (if any JavaScript tooling is added)
+node_modules/
+
+# Test output
+test-results/
+coverage/
+
+# Backup files
+*.bak
+*.backup
+.temp/
