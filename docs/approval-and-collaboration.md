@@ -93,3 +93,23 @@ Security notes
 - Prefer a fine-grained token with the minimal permissions required. If you use a classic token, restrict and rotate it regularly.
 - Keep the token secret; store it only in repository secrets and never in code.
 - After testing, you can revoke the PAT from your GitHub account settings if you no longer want automated approvals.
+
+Bot account setup (recommended for automation)
+---------------------------------------------
+
+1. Create a bot/service GitHub account (for example: `amo3167`).
+2. Add the bot account to your organization or invite it as a collaborator, then add its handle to `.github/CODEOWNERS` (we added `@amo3167` as a placeholder).
+3. Create a fine-grained token for the bot with minimal repo permissions:
+	- Repository: select `andymo-sportsbet/jira-copilot-assistant` only
+	- Permissions: Pull requests (Read & Write), Contents (Read)
+4. Store the token as a repository secret named `BOT_SELF_APPROVE_TOKEN`:
+
+```bash
+gh secret set BOT_SELF_APPROVE_TOKEN --body 'PASTE_TOKEN_HERE' --repo andymo-sportsbet/jira-copilot-assistant
+```
+
+5. Confirm the workflow uses `BOT_SELF_APPROVE_TOKEN` (we updated `.github/workflows/self-approve-and-merge.yml`).
+
+6. Test: open a PR from a personal account and comment `/self-approve` (the PR author must post the comment). The workflow will run and the bot will post the approval and optionally merge.
+
+Security reminder: the bot account is powerful; rotate its token and limit its scope to the specific repository.

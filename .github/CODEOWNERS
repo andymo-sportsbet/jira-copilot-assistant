@@ -2,5 +2,6 @@
 # This requires at least one review from the listed owners when branch protection
 # is configured to "Require review from Code Owners".
 
-# Replace `andymo-sportsbet` with the exact GitHub username/org if different.
-* @andymo-sportsbet
+# Replace `amo3167` with the bot account you created (example: @amo3167).
+# The bot account must be a code owner so its approval counts as required review.
+* @andymo-sportsbet @amo3167
