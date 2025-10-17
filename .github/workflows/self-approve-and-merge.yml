@@ -1,0 +1,65 @@
+name: Self-approve and (optionally) merge
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  self-approve:
+    # only run for pull request comments
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture commenter and body
+        id: captures
+        run: |
+          echo "commenter=${{ github.event.comment.user.login }}" >> $GITHUB_OUTPUT
+          # single-line body capture
+          BODY=$(echo "${{ github.event.comment.body }}" | tr -d '\r')
+          echo "body=${BODY}" >> $GITHUB_OUTPUT
+
+      - name: Validate allowed user and command
+        id: validate
+        run: |
+          ALLOWED="andymo-sportsbet" # change if your username is different
+          if [ "${{ steps.captures.outputs.commenter }}" != "$ALLOWED" ]; then
+            echo "Not an allowed user: ${ { steps.captures.outputs.commenter } }" >&2
+            exit 78
+          fi
+          case "${{ steps.captures.outputs.body }}" in
+            "/self-approve") echo "merge=no" >> $GITHUB_OUTPUT ;;
+            "/self-approve-and-merge") echo "merge=yes" >> $GITHUB_OUTPUT ;;
+            *) echo "No valid command in comment; exiting" >&2 ; exit 78 ;;
+          esac
+
+      - name: Approve PR via API (as you)
+        if: always()
+        env:
+          TOKEN: ${{ secrets.SELF_APPROVE_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "SELF_APPROVE_TOKEN secret not set" >&2
+            exit 1
+          fi
+          echo "Posting approval for PR #${PR_NUMBER} as ${OWNER}"
+          curl -s -H "Authorization: token $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -X POST "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/reviews" \
+            -d '{"body":"Automated code-owner approval","event":"APPROVE"}'
+
+      - name: Merge PR via API (optional)
+        if: ${{ steps.validate.outputs.merge == 'yes' }}
+        env:
+          TOKEN: ${{ secrets.SELF_APPROVE_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          echo "Merging PR #${PR_NUMBER}"
+          curl -s -H "Authorization: token $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -X PUT "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/merge" \
+            -d '{"merge_method":"merge"}'

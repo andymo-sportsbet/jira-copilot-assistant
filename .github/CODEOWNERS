@@ -1,0 +1,6 @@
+# Make the repository owner the code owner for everything.
+# This requires at least one review from the listed owners when branch protection
+# is configured to "Require review from Code Owners".
+
+# Replace `andymo-sportsbet` with the exact GitHub username/org if different.
+* @andymo-sportsbet
