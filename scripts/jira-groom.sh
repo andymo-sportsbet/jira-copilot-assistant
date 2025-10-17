@@ -698,8 +698,17 @@ main() {
         technical_guide=$(extract_technical_details "$reference_file")
     fi
     
-    # Get current description from JIRA
-    local current_description=$(echo "$ticket_data" | jq -r '.fields.description.content[0].content[0].text // ""' 2>/dev/null || echo "")
+    # Get current description from JIRA (handle ADF object or plain string)
+    local current_description=""
+    # Try to extract text from ADF if description is an object
+    if echo "$ticket_data" | jq -e '.fields.description and (.fields.description | type == "object")' >/dev/null 2>&1; then
+        # Collect all text fragments from ADF and preserve paragraph boundaries
+        # Join fragments with a single newline so markdown headings and lists survive
+        current_description=$(echo "$ticket_data" | jq -r '.fields.description | .. | .text? // empty' 2>/dev/null | awk 'BEGIN{ORS="\n"} {gsub(/^[ \t]+|[ \t]+$/,"",$0); print}' | sed '/^[[:space:]]*$/d')
+    else
+        # Fallback to string description or empty (preserve it as-is)
+        current_description=$(echo "$ticket_data" | jq -r '.fields.description // ""' 2>/dev/null || echo "")
+    fi
     
     # Markers to identify generated content
     local start_marker="⚡ COPILOT_GENERATED_START ⚡"
@@ -721,15 +730,32 @@ main() {
         manual_content="$current_description"
     fi
     
-    # If AI description provided, use it (it will be wrapped in markers)
+    # If AI description provided, read and sanitize it (preserve blank lines, strip YAML front matter, remove markers)
     local ai_description=""
     if [[ -n "$ai_description_file" ]]; then
         if [[ ! -f "$ai_description_file" ]]; then
             error "AI description file not found: $ai_description_file"
             return 1
         fi
-        info "Using AI-generated description..."
-        ai_description=$(cat "$ai_description_file")
+        info "Reading AI-generated description..."
+
+        # Read whole file, strip YAML front matter if present, trim per-line whitespace but preserve blank lines
+        ai_description=$(awk '
+            BEGIN{in_front=0}
+            NR==1 && $0 ~ /^---\s*$/ {in_front=1; next}
+            in_front==1 && $0 ~ /^---\s*$/ {in_front=0; next}
+            in_front==1 {next}
+            {gsub(/^[ \t]+|[ \t]+$/,"",$0); print}
+        ' "$ai_description_file")
+
+        # Remove markers if the AI text already includes them to prevent duplication
+        ai_description=$(printf "%s" "$ai_description" | sed 's/⚡ COPILOT_GENERATED_START ⚡//g' | sed 's/⚡ COPILOT_GENERATED_END ⚡//g')
+
+        # If after sanitization the description is empty, abort
+        if [[ -z "${ai_description//[[:space:]]/}" ]]; then
+            error "AI description is empty after sanitization: $ai_description_file"
+            return 1
+        fi
     fi
     
     # Build enhanced description with smart marker deduplication
@@ -786,7 +812,19 @@ main() {
     fi
     
     # Convert enhanced description to JIRA ADF format
-    local description_adf=$(markdown_to_jira_adf "$enhanced_description")
+    local description_adf
+    description_adf=$(markdown_to_jira_adf "$enhanced_description") || {
+        error "markdown_to_jira_adf() failed to convert the description"
+        exit 1
+    }
+
+    # Validate that the converter returned valid JSON (or a JSON ADF object)
+    if ! echo "$description_adf" | jq -e '.' >/dev/null 2>&1; then
+        error "Converted description is not valid JSON ADF. Aborting update."
+        # Dump a small sample for debugging (first 200 chars)
+        echo "Converted output (truncated): $(echo "$description_adf" | head -c 200)" >&2
+        exit 1
+    fi
     
     # Build update JSON with story points if estimation is enabled
     local update_json
