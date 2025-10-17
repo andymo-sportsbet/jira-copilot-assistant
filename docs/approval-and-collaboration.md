@@ -97,8 +97,8 @@ Security notes
 Bot account setup (recommended for automation)
 ---------------------------------------------
 
-1. Create a bot/service GitHub account (for example: `andymo-bot`).
-2. Add the bot account to your organization or invite it as a collaborator, then add its handle to `.github/CODEOWNERS` (we added `@andymo-bot` as a placeholder).
+1. Create a bot/service GitHub account (for example: `amo3167`).
+2. Add the bot account to your organization or invite it as a collaborator, then add its handle to `.github/CODEOWNERS` (we added `@amo3167` as a placeholder).
 3. Create a fine-grained token for the bot with minimal repo permissions:
 	- Repository: select `andymo-sportsbet/jira-copilot-assistant` only
 	- Permissions: Pull requests (Read & Write), Contents (Read)
