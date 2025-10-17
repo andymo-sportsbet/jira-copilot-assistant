@@ -18,12 +18,14 @@ jobs:
           BODY=$(echo "${{ github.event.comment.body }}" | tr -d '\r')
           echo "body=${BODY}" >> $GITHUB_OUTPUT
 
-      - name: Validate allowed user and command
+      - name: Validate command and commenter
         id: validate
         run: |
-          ALLOWED="andymo-sportsbet" # change if your username is different
-          if [ "${{ steps.captures.outputs.commenter }}" != "$ALLOWED" ]; then
-            echo "Not an allowed user: ${ { steps.captures.outputs.commenter } }" >&2
+          # We expect the PR author to comment with the command. The bot will act using its token.
+          PR_AUTHOR="${{ github.event.issue.user.login }}"
+          COMMENTER="${{ steps.captures.outputs.commenter }}"
+          if [ "$COMMENTER" != "$PR_AUTHOR" ]; then
+            echo "Commenter ($COMMENTER) is not the PR author ($PR_AUTHOR); ignoring." >&2
             exit 78
           fi
           case "${{ steps.captures.outputs.body }}" in
@@ -32,10 +34,10 @@ jobs:
             *) echo "No valid command in comment; exiting" >&2 ; exit 78 ;;
           esac
 
-      - name: Approve PR via API (as you)
+      - name: Approve PR via API (as bot)
         if: always()
         env:
-          TOKEN: ${{ secrets.SELF_APPROVE_TOKEN }}
+          TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           PR_NUMBER: ${{ github.event.issue.number }}
@@ -53,7 +55,7 @@ jobs:
       - name: Merge PR via API (optional)
         if: ${{ steps.validate.outputs.merge == 'yes' }}
         env:
-          TOKEN: ${{ secrets.SELF_APPROVE_TOKEN }}
+          TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           PR_NUMBER: ${{ github.event.issue.number }}
