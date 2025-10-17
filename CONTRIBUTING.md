@@ -186,4 +186,15 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
+### Approval workflow
+
+- Branches: create feature branches from `main`.
+- PRs: open a pull request targeting `main` and add reviewers.
+- Approval: At least one approval from the CODEOWNER (`@andymo-sportsbet`) is required before merge.
+- CI: Ensure all CI checks pass (if configured).
+
+If you need a merge, request a review from `@andymo-sportsbet` and mention the purpose and testing done.
+
+---
+
 Thank you for making JIRA Copilot Assistant better! 🚀
