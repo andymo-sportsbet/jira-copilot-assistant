@@ -47,10 +47,30 @@ jobs:
             exit 1
           fi
           echo "Posting approval for PR #${PR_NUMBER} as ${OWNER}"
-          curl -s -H "Authorization: token $TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -X POST "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/reviews" \
-            -d '{"body":"Automated code-owner approval","event":"APPROVE"}'
+          # Retry up to 3 times if the API call fails; log response body and HTTP code for debugging
+          n=0
+          code=0
+          until [ "$n" -ge 3 ]; do
+            resp=$(curl -s -w "\n%{http_code}" -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -X POST "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/reviews" \
+              -d '{"body":"Automated code-owner approval","event":"APPROVE"}') || true
+            code=$(echo "$resp" | tail -n1)
+            body=$(echo "$resp" | sed '$d')
+            echo "HTTP code: ${code}"
+            echo "Response body: ${body}"
+            if [ "${code}" = "200" ] || [ "${code}" = "201" ]; then
+              echo "Approval posted successfully"
+              break
+            fi
+            n=$((n+1))
+            echo "Approval attempt ${n} failed (code ${code}). Retrying in 2s..."
+            sleep 2
+          done
+          if [ "$n" -ge 3 ] && [ "${code}" != "200" ] && [ "${code}" != "201" ]; then
+            echo "Failed to post approval after retries (last http code ${code})" >&2
+            exit 1
+          fi
 
       - name: Merge PR via API (optional)
         if: ${{ steps.validate.outputs.merge == 'yes' }}
@@ -61,7 +81,27 @@ jobs:
           PR_NUMBER: ${{ github.event.issue.number }}
         run: |
           echo "Merging PR #${PR_NUMBER}"
-          curl -s -H "Authorization: token $TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -X PUT "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/merge" \
-            -d '{"merge_method":"merge"}'
+          # Retry merge up to 3 times and log response for debugging
+          m=0
+          mcode=0
+          until [ "$m" -ge 3 ]; do
+            mresp=$(curl -s -w "\n%{http_code}" -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -X PUT "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/merge" \
+              -d '{"merge_method":"merge"}') || true
+            mcode=$(echo "$mresp" | tail -n1)
+            mbody=$(echo "$mresp" | sed '$d')
+            echo "Merge HTTP code: ${mcode}"
+            echo "Merge response body: ${mbody}"
+            if [ "${mcode}" = "200" ] || [ "${mcode}" = "201" ]; then
+              echo "Merge succeeded"
+              break
+            fi
+            m=$((m+1))
+            echo "Merge attempt ${m} failed (code ${mcode}). Retrying in 2s..."
+            sleep 2
+          done
+          if [ "$m" -ge 3 ] && [ "${mcode}" != "200" ] && [ "${mcode}" != "201" ]; then
+            echo "Failed to merge PR after retries (last http code ${mcode})" >&2
+            exit 1
+          fi
