@@ -310,6 +310,22 @@ confluence_extract_page_id() {
     return 0
 }
 
+# List pages in a Confluence space (returns newline-separated page IDs)
+# Usage: confluence_list_pages_in_space "SPACE_KEY"
+confluence_list_pages_in_space() {
+    local space_key="$1"
+    if [ -z "$space_key" ]; then
+        error "Space key is required"
+        return 1
+    fi
+
+    # Fetch first page of results (limit 200). For larger spaces, paging would be required.
+    local response=$(curl -s -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" "${CONFLUENCE_BASE_URL}/rest/api/content?spaceKey=${space_key}&type=page&limit=200")
+    local http_code=200
+    # Extract IDs
+    echo "$response" | jq -r '.results[].id // empty'
+}
+
 # Debug: Print Confluence environment configuration
 confluence_debug_config() {
     if [ "${DEBUG:-false}" = "true" ]; then

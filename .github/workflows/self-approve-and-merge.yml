@@ -1,11 +1,16 @@
 name: Self-approve and (optionally) merge
 
 on:
-  # Do NOT trigger on issue_comment events. Comments must not trigger approval.
-  # Only run in the base repo context when a PR is opened/updated so secrets are
-  # available. Auto-approve only when the PR author is the repository owner.
+  # The workflow supports two safe entry points:
+  # 1) pull_request_target for PR open/update events (runs in base repo context so secrets are available)
+  #    — used to auto-approve+merge when the PR author is the repository owner.
+  # 2) issue_comment created on a PR by the repository owner using the exact commands
+  #    (/self-approve or /self-approve-and-merge). We validate the commenter is the repo owner
+  #    before taking any action.
   pull_request_target:
     types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
   # Allow manual runs for testing/maintenance
   workflow_dispatch: {}
 
@@ -14,28 +19,73 @@ jobs:
     # Job always runs for configured events; the Validate step decides whether to act
     runs-on: ubuntu-latest
     steps:
-      - name: Validate PR author is repository owner
+      - name: Validate trigger, ensure owner and command (if comment)
         id: validate
         run: |
-          # Only the pull_request_target path triggers this workflow. Auto-approve
-          # only when the PR author is the repository owner. Do not auto-merge.
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          REPO_OWNER="${{ github.repository_owner }}"
-          echo "Triggered by event: ${{ github.event_name }}; PR author: $PR_AUTHOR; repo owner: $REPO_OWNER"
-          if [ "$PR_AUTHOR" != "$REPO_OWNER" ]; then
-            echo "PR author is not the repository owner; skipping auto-approve." >&2
+          set -euo pipefail
+          EVENT_NAME='${{ github.event_name }}'
+          REPO_OWNER='${{ github.repository_owner }}'
+          echo "Triggered by event: ${EVENT_NAME}; repo owner: ${REPO_OWNER}"
+
+          PR_NUMBER=''
+          MERGE='no'
+          PROCEED='no'
+
+          if [ "${EVENT_NAME}" = "pull_request_target" ]; then
+            PR_NUMBER='${{ github.event.pull_request.number }}'
+            PR_AUTHOR='${{ github.event.pull_request.user.login }}'
+            echo "PR author: ${PR_AUTHOR}"
+            if [ "${PR_AUTHOR}" != "${REPO_OWNER}" ]; then
+              echo "PR author is not the repository owner; skipping auto-approve." >&2
+              exit 78
+            fi
+            # Owner-created PR — approve and merge
+            MERGE='yes'
+            PROCEED='yes'
+
+          elif [ "${EVENT_NAME}" = "issue_comment" ]; then
+            # Ensure the comment was created on a PR (issue.pull_request exists)
+            IS_PR='${{ toJson(github.event.issue.pull_request) }}'
+            if [ "${IS_PR}" = "null" ] || [ -z "${IS_PR}" ]; then
+              echo "Comment is not on a PR; skipping." >&2
+              exit 78
+            fi
+            COMMENT_AUTHOR='${{ github.event.comment.user.login }}'
+            COMMENT_BODY='${{ github.event.comment.body }}'
+            echo "Comment author: ${COMMENT_AUTHOR}"
+            if [ "${COMMENT_AUTHOR}" != "${REPO_OWNER}" ]; then
+              echo "Commenter is not the repository owner; skipping." >&2
+              exit 78
+            fi
+            # Only accept explicit owner commands
+            if echo "${COMMENT_BODY}" | grep -Eq '^/self-approve-and-merge\b'; then
+              PR_NUMBER='${{ github.event.issue.number }}'
+              MERGE='yes'
+              PROCEED='yes'
+            elif echo "${COMMENT_BODY}" | grep -Eq '^/self-approve\b'; then
+              PR_NUMBER='${{ github.event.issue.number }}'
+              MERGE='no'
+              PROCEED='yes'
+            else
+              echo "Owner comment did not contain an approve command; skipping." >&2
+              exit 78
+            fi
+          else
+            echo "Unsupported event ${EVENT_NAME}; skipping." >&2
             exit 78
           fi
-          # Auto-approve on PR open/update and auto-merge for repo owner PRs
-          echo "merge=yes" >> $GITHUB_OUTPUT
+
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "merge=${MERGE}" >> $GITHUB_OUTPUT
+          echo "proceed=${PROCEED}" >> $GITHUB_OUTPUT
 
       - name: Approve PR via API (as bot)
-        if: always()
+        if: ${{ steps.validate.outputs.proceed == 'yes' }}
         env:
           TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.validate.outputs.pr_number }}
         run: |
           if [ -z "$TOKEN" ]; then
             echo "SELF_APPROVE_TOKEN secret not set" >&2
@@ -73,7 +123,7 @@ jobs:
           TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.validate.outputs.pr_number }}
         run: |
           echo "Merging PR #${PR_NUMBER}"
           # Retry merge up to 3 times and log response for debugging
