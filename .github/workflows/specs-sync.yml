@@ -1,0 +1,42 @@
+name: Sync specs from Confluence
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # daily 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node (for gh CLI if needed)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Make sure scripts are executable
+        run: |
+          chmod +x scripts/confluence-to-spec.sh || true
+          chmod +x scripts/specs-sync-wrapper.sh || true
+      - name: Run Confluence -> spec sync
+        env:
+          CONFLUENCE_BASE_URL: ${{ secrets.CONFLUENCE_BASE_URL }}
+          CONFLUENCE_TOKEN: ${{ secrets.CONFLUENCE_TOKEN }}
+        run: |
+          ./scripts/specs-sync-wrapper.sh --space DATAFEEDS --output specs/
+      - name: Commit & create PR if changed
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain)" ]]; then
+            BRANCH="auto/specs-sync-$(date -u +%Y%m%d%H%M%S)"
+            git checkout -b "$BRANCH"
+            git add specs/
+            git commit -m "chore(specs): update from Confluence $(date -u +%Y-%m-%d)"
+            git push origin "$BRANCH"
+            gh pr create --title "chore(specs): Confluence sync $(date -u +%Y-%m-%d)" --body "Auto-updated specs from Confluence" --base main --head "$BRANCH"
+          else
+            echo "No spec changes; nothing to do."
+          fi
