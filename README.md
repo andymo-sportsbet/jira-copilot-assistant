@@ -6,6 +6,8 @@
 [![Bash](https://img.shields.io/badge/Bash-3.2+-green.svg)](https://www.gnu.org/software/bash/)
 [![JIRA API](https://img.shields.io/badge/JIRA%20API-v3-blue.svg)](https://developer.atlassian.com/cloud/jira/platform/rest/v3/)
 
+[![PR Coverage](https://github.com/andymo-sportsbet/jira-copilot-assistant/actions/workflows/coverage.yml/badge.svg)](https://github.com/andymo-sportsbet/jira-copilot-assistant/actions/workflows/coverage.yml)
+
 **Stop context-switching between VS Code and JIRA.** Create, enhance, and manage JIRA tickets directly from your editor using GitHub Copilot's natural language understanding and simple shell scripts.
 
 ---

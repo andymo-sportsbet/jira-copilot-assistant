@@ -38,7 +38,16 @@ debug() {
 # Load environment from .env file
 load_env() {
     local env_file="${1:-.env}"
-    
+
+    # If a test env exists next to the requested env file, prefer it.
+    # e.g., if env_file is ./.env or /path/to/.env then check for .env.test.local
+    local env_dir
+    env_dir=$(dirname "$env_file")
+    local test_env_file="$env_dir/.env.test.local"
+    if [[ -f "$test_env_file" ]]; then
+        env_file="$test_env_file"
+    fi
+
     if [[ -f "$env_file" ]]; then
         debug "Loading environment from $env_file"
         set -a

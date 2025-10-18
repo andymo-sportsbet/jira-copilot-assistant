@@ -1,5 +1,7 @@
 # Environment variables with sensitive credentials
 .env
+# Local integration test env (keep private)
+.env.test.local
 
 # Temporary AI-generated files
 .temp/
@@ -50,3 +52,8 @@ coverage/
 *.bak
 *.backup
 .temp/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class

@@ -1,0 +1,26 @@
+name: Bats tests (unit + integration)
+
+on:
+  push:
+    branches: [ main, master, ci/add-tests-workflow ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats jq
+
+      - name: Run Bats unit tests
+        run: |
+          echo "Running unit Bats tests"
+          bats tests/bash/test_libs.bats
+
+      # Integration tests (mock JIRA) removed — repository uses unit tests only
