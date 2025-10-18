@@ -26,8 +26,8 @@ jobs:
             echo "PR author is not the repository owner; skipping auto-approve." >&2
             exit 78
           fi
-          # Auto-approve on PR open/update but do not auto-merge
-          echo "merge=no" >> $GITHUB_OUTPUT
+          # Auto-approve on PR open/update and auto-merge for repo owner PRs
+          echo "merge=yes" >> $GITHUB_OUTPUT
 
       - name: Approve PR via API (as bot)
         if: always()
