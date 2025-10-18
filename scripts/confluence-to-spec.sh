@@ -62,6 +62,7 @@ EOF
 URL=""
 PAGE_ID=""
 OUTPUT_PATH=""
+SPACE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -69,6 +70,10 @@ while [[ $# -gt 0 ]]; do
             URL="$2"
             shift 2
             ;;
+            --space)
+                SPACE="$2"
+                shift 2
+                ;;
         --page-id)
             PAGE_ID="$2"
             shift 2
@@ -118,8 +123,8 @@ if [ -n "$URL" ] && [ -z "$PAGE_ID" ]; then
 fi
 
 # Validate we have a page ID
-if [ -z "$PAGE_ID" ]; then
-    error "Either --url or --page-id is required"
+if [ -z "$PAGE_ID" ] && [ -z "$SPACE" ]; then
+    error "Either --url, --page-id or --space is required"
     echo ""
     show_help
     exit 1
@@ -127,7 +132,11 @@ fi
 
 # Set default output path if not provided
 if [ -z "$OUTPUT_PATH" ]; then
-    OUTPUT_PATH="specs/confluence-${PAGE_ID}/spec.md"
+    if [ -n "$PAGE_ID" ]; then
+        OUTPUT_PATH="specs/confluence-${PAGE_ID}/spec.md"
+    else
+        OUTPUT_PATH="$OUTPUT"
+    fi
 fi
 
 # Check Confluence authentication
@@ -141,10 +150,28 @@ fi
 
 # Fetch Confluence page
 info "Fetching Confluence page: $PAGE_ID..."
-page_data=$(confluence_get_page "$PAGE_ID")
-if [ $? -ne 0 ]; then
-    error "Failed to fetch Confluence page"
-    exit 1
+if [ -n "$PAGE_ID" ]; then
+    page_data=$(confluence_get_page "$PAGE_ID")
+    if [ $? -ne 0 ]; then
+        error "Failed to fetch Confluence page $PAGE_ID"
+        exit 1
+    fi
+fi
+
+# If SPACE was provided, iterate pages in the space and generate spec files
+if [ -n "$SPACE" ]; then
+    info "Listing pages in space: $SPACE"
+    ids=$(confluence_list_pages_in_space "$SPACE")
+    if [ -z "$ids" ]; then
+        info "No pages found in space $SPACE"
+        exit 0
+    fi
+    for pid in $ids; do
+        OUT_DIR="${OUTPUT}/${pid}"
+        mkdir -p "$OUT_DIR"
+        ./scripts/confluence-to-spec.sh --page-id "$pid" --output "$OUT_DIR/spec.md"
+    done
+    exit 0
 fi
 
 # Extract metadata
