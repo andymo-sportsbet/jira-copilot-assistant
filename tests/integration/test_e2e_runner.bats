@@ -16,6 +16,6 @@ setup() {
     skip ".env.test.local not present; skipping E2E run"
   fi
 
-  run bash "$ROOT_DIR/scripts/e2e-run.sh"
+  run bash "$ROOT_DIR/tests/integration/e2e-run.sh"
   [ "$status" -eq 0 ]
 }
