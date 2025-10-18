@@ -26,6 +26,10 @@ source "${SCRIPT_DIR}/lib/jira-estimate-team.sh"
 # Load environment
 load_env "${SCRIPT_DIR}/../.env"
 
+# Global markers used by grooming to identify AI-generated sections
+start_marker="⚡ COPILOT_GENERATED_START ⚡"
+end_marker="⚡ COPILOT_GENERATED_END ⚡"
+
 # Show help
 show_help() {
     cat << EOF
@@ -111,6 +115,18 @@ update_story_points() {
     local ticket_key="$1"
     local points="$2"
     
+    # Always initialize manual_content before any use
+    local manual_content=""
+    if echo "$current_description" | grep -q "$start_marker"; then
+        manual_content=$(echo "$current_description" | awk -v marker="$start_marker" '
+            $0 ~ marker { exit }
+            { print }
+        ' | sed 's/[[:space:]]*$//')
+        manual_content=$(echo "$manual_content" | sed 's/---[[:space:]]*$//' | sed 's/[[:space:]]*$//')
+    fi
+    if [[ -z "$manual_content" ]]; then
+        manual_content="$current_description"
+    fi
     # Get story points field from environment or use default
     local story_points_field="${JIRA_STORY_POINTS_FIELD:-customfield_10016}"
     
@@ -536,8 +552,14 @@ main() {
         exit 1
     fi
     
+    # Save a raw current_description globally so helper functions can access it
+    current_description=$(echo "$ticket_data" | jq -r '.fields.description // ""' 2>/dev/null || echo "")
+
     local summary=$(echo "$ticket_data" | jq -r '.fields.summary')
     info "Ticket: $summary"
+
+    # Determine description type early: null / string / object
+    desc_type=$(echo "$ticket_data" | jq -r 'if .fields.description == null then "null" elif (.fields.description|type) == "string" then "string" else "object" end')
     
     # Handle manual story points
     if [[ -n "$manual_points" ]]; then
@@ -699,36 +721,64 @@ main() {
     fi
     
     # Get current description from JIRA (handle ADF object or plain string)
-    local current_description=""
-    # Try to extract text from ADF if description is an object
-    if echo "$ticket_data" | jq -e '.fields.description and (.fields.description | type == "object")' >/dev/null 2>&1; then
-        # Collect all text fragments from ADF and preserve paragraph boundaries
-        # Join fragments with a single newline so markdown headings and lists survive
-        current_description=$(echo "$ticket_data" | jq -r '.fields.description | .. | .text? // empty' 2>/dev/null | awk 'BEGIN{ORS="\n"} {gsub(/^[ \t]+|[ \t]+$/,"",$0); print}' | sed '/^[[:space:]]*$/d')
-    else
-        # Fallback to string description or empty (preserve it as-is)
-        current_description=$(echo "$ticket_data" | jq -r '.fields.description // ""' 2>/dev/null || echo "")
+        # Markers to identify generated content
+        local start_marker="⚡ COPILOT_GENERATED_START ⚡"
+        local end_marker="⚡ COPILOT_GENERATED_END ⚡"
+
+        # Derive manual_content from current_description (preserve original description if it's a plain string)
+        local manual_content=""
+        if [[ -n "$current_description" && "$desc_type" != "object" ]]; then
+            if echo "$current_description" | grep -q "$start_marker"; then
+                manual_content=$(echo "$current_description" | awk -v marker="$start_marker" '
+                    $0 ~ marker { exit }
+                    { print }
+                ' | sed 's/[[:space:]]*$//' )
+                manual_content=$(echo "$manual_content" | sed 's/---[[:space:]]*$//' | sed 's/[[:space:]]*$//')
+            else
+                manual_content="$current_description"
+            fi
+        fi
+
+        local enhanced_description=""
+        # Only include the original ticket description in the markdown when it is plain text
+        if [[ -n "$manual_content" ]]; then
+            enhanced_description+="$manual_content"
+            enhanced_description+=$'\n\n---\n\n'
+        elif [[ -n "${original_summary:-}" ]]; then
+            # Include a short original summary and a link to the backup .temp ADF file on the grooming host
+            enhanced_description+="Original summary: ${original_summary}\n\n"
+            enhanced_description+="(Full original ADF saved to: .temp/${ticket_key}-original-adf.json on the grooming host)"
+            enhanced_description+=$'\n\n---\n\n'
+        fi
+
+    # Add markers around ALL generated content
+    enhanced_description+="$start_marker\n\n"
+
+    # Initialize ai_description (may be set later if --ai-description provided)
+    local ai_description=""
+
+    # Add AI-generated description (if provided)
+    if [[ -n "$ai_description" ]]; then
+        enhanced_description+="$ai_description\n\n---\n\n"
     fi
-    
-    # Markers to identify generated content
-    local start_marker="⚡ COPILOT_GENERATED_START ⚡"
-    local end_marker="⚡ COPILOT_GENERATED_END ⚡"
-    
-    # Extract manual content (everything before markers, if they exist)
-    local manual_content=""
-    if echo "$current_description" | grep -q "$start_marker"; then
-        # Extract everything before the start marker
-        manual_content=$(echo "$current_description" | awk -v marker="$start_marker" '
-            $0 ~ marker { exit }
-            { print }
-        ' | sed 's/[[:space:]]*$//')
-        
-        # Remove trailing separators from manual content
-        manual_content=$(echo "$manual_content" | sed 's/---[[:space:]]*$//' | sed 's/[[:space:]]*$//')
-    else
-        # No markers exist, keep all current content as manual
-        manual_content="$current_description"
+
+    # Add acceptance criteria
+    enhanced_description+="$acceptance_criteria"
+
+    # Add GitHub context if present
+    if [[ -n "$github_context" ]] && [[ "$github_context" != "No related GitHub activity found." ]]; then
+        enhanced_description+=$'\n\n---\n\n'
+        enhanced_description+="$github_context"
     fi
+
+    # Add story point estimation if enabled
+    if [[ "$enable_estimation" == "true" ]] && [[ -n "$story_points" ]]; then
+        enhanced_description+=$'\n\n---\n\n'
+        enhanced_description+="## 📊 AI Story Point Estimation\n\n**Estimated Effort: $story_points Story Points**\n\n$estimation_explanation\n\n_Note: This is an AI-generated estimate based on ticket content. Team review recommended._"
+    fi
+
+    enhanced_description+=$'\n\n'
+    enhanced_description+="$end_marker"
     
     # If AI description provided, read and sanitize it (preserve blank lines, strip YAML front matter, remove markers)
     local ai_description=""
@@ -764,6 +814,12 @@ main() {
     # 1. Start with manual content (if any)
     if [[ -n "$manual_content" ]]; then
         enhanced_description="$manual_content"
+        enhanced_description+=$'\n\n---\n\n'
+    elif [[ -n "${original_summary:-}" ]]; then
+        # Include a short original summary and a link to the backup .temp ADF file on the grooming host
+        enhanced_description+="Original summary: ${original_summary}"
+        enhanced_description+=$'\n\n'
+        enhanced_description+="(Full original ADF saved to: .temp/${ticket_key}-original-adf.json on the grooming host)"
         enhanced_description+=$'\n\n---\n\n'
     fi
     
@@ -818,11 +874,98 @@ main() {
         exit 1
     }
 
-    # Validate that the converter returned valid JSON (or a JSON ADF object)
+    # Ensure .temp exists for intermediate ADF files
+    local temp_dir="${SCRIPT_DIR}/../.temp"
+    mkdir -p "$temp_dir"
+
+    # Prepare enhanced ADF file
+    local enhanced_adf_file="$temp_dir/${ticket_key}-enhanced-adf.json"
+    printf "%s" "$description_adf" > "$enhanced_adf_file"
+
+    # Prepare original ADF file: try to extract the ADF object from ticket_data
+    local original_adf_file="$temp_dir/${ticket_key}-original-adf.json"
+    # Determine description type: null / string / object
+    local desc_type
+    desc_type=$(echo "$ticket_data" | jq -r 'if .fields.description == null then "null" elif (.fields.description|type) == "string" then "string" else "object" end')
+
+    # Initialize helpers
+    original_summary=""
+    orig_text=""
+
+    if [[ "$desc_type" == "object" ]]; then
+        # Save raw ADF object then try to strip any AI-generated nodes
+        echo "$ticket_data" | jq '.fields.description' > "$original_adf_file"
+
+        # If it's valid JSON, attempt to remove content nodes that contain the start marker
+        if jq -e '.' "$original_adf_file" >/dev/null 2>&1; then
+            jq --arg marker "$start_marker" '
+                def contains_marker: (.. | objects | .text? // "" | contains($marker));
+                . as $d |
+                ($d.content | to_entries | map(select(.value | contains_marker) | .key) | .[0]) as $idx |
+                if $idx == null then $d else { type: "doc", version: ($d.version // 1), content: ($d.content[0:$idx]) } end' "$original_adf_file" > "${original_adf_file}.tmp" && mv "${original_adf_file}.tmp" "$original_adf_file" || true
+        fi
+
+        # Extract a short human summary from the cleaned original ADF (first paragraph/text found)
+        original_summary=$(jq -r '(.. | objects | select(.type=="paragraph") | .. | .text?) // empty' "$original_adf_file" 2>/dev/null | sed -n '1p' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-200)
+
+    elif [[ "$desc_type" == "string" ]]; then
+        # The description is a string - try to parse as JSON ADF, otherwise treat as plain text
+        orig_text=$(echo "$ticket_data" | jq -r '.fields.description')
+
+        if printf "%s" "$orig_text" | jq -e '.' >/dev/null 2>&1; then
+            # It's valid JSON (serialized ADF) - parse then strip AI-generated nodes if present
+            printf "%s" "$orig_text" | jq '.' > "$original_adf_file"
+            jq --arg marker "$start_marker" '
+                def contains_marker: (.. | objects | .text? // "" | contains($marker));
+                . as $d |
+                ($d.content | to_entries | map(select(.value | contains_marker) | .key) | .[0]) as $idx |
+                if $idx == null then $d else { type: "doc", version: ($d.version // 1), content: ($d.content[0:$idx]) } end' "$original_adf_file" > "${original_adf_file}.tmp" && mv "${original_adf_file}.tmp" "$original_adf_file" || true
+
+            original_summary=$(jq -r '(.. | objects | select(.type=="paragraph") | .. | .text?) // empty' "$original_adf_file" 2>/dev/null | sed -n '1p' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-200)
+        else
+            # Plain text - remove any AI-generated section (lines after start_marker) and wrap as codeBlock ADF
+            local cleaned_text
+            cleaned_text=$(printf "%s" "$orig_text" | awk -v m="$start_marker" '$0 ~ m {exit} {print}')
+
+            # Detect probable language for the code block (json if starts with { or [)
+            local lang="text"
+            if printf "%s" "$cleaned_text" | sed -n '1p' | grep -Eq '^[[:space:]]*[{[]'; then
+                lang="json"
+            fi
+
+            jq -n --arg text "$cleaned_text" --arg lang "$lang" \
+              '{type: "doc", version: 1, content: [{type: "codeBlock", attrs: {language: $lang}, content: [{type: "text", text: $text}]}]}' > "$original_adf_file"
+
+            original_summary=$(printf "%s" "$cleaned_text" | sed -n '1p' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-200)
+        fi
+
+    else
+        # No description present - write an empty JIRA doc to keep downstream code simple
+        jq -n '{type: "doc", version: 1, content: []}' > "$original_adf_file"
+        original_summary=""
+    fi
+
+    # Safety check: ensure the saved original ADF does NOT contain any AI-generated markers
+    if jq -e --arg marker "$start_marker" '([.. | .text? // empty] | map(select(contains($marker))) | length) > 0' "$original_adf_file" >/dev/null 2>&1; then
+        error "Saved original ADF contains AI-generated marker '$start_marker'. Aborting to avoid preserving AI content."
+        echo "Original ADF saved at: $original_adf_file" >&2
+        exit 1
+    fi
+
+    # Merge original + enhanced ADF using the Python helper to avoid fragile shell/json handling
+    local merged_adf_file="$temp_dir/${ticket_key}-merged-adf.json"
+    if ! python3 "${SCRIPT_DIR}/lib/merge_adf.py" --original "$original_adf_file" --enhanced "$enhanced_adf_file" --output "$merged_adf_file" >/dev/null 2>&1; then
+        warning "merge_adf.py failed; falling back to using the enhanced ADF only"
+        # Use the enhanced ADF as-is
+        description_adf=$(cat "$enhanced_adf_file")
+    else
+        description_adf=$(cat "$merged_adf_file")
+    fi
+
+    # Validate that the final description_adf is valid JSON ADF
     if ! echo "$description_adf" | jq -e '.' >/dev/null 2>&1; then
-        error "Converted description is not valid JSON ADF. Aborting update."
-        # Dump a small sample for debugging (first 200 chars)
-        echo "Converted output (truncated): $(echo "$description_adf" | head -c 200)" >&2
+        error "Final merged description is not valid JSON ADF. Aborting update."
+        echo "Final output (truncated): $(echo "$description_adf" | head -c 200)" >&2
         exit 1
     fi
     
