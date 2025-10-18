@@ -82,14 +82,17 @@ jobs:
       - name: Approve PR via API (as bot)
         if: ${{ steps.validate.outputs.proceed == 'yes' }}
         env:
-          TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN }}
+          # Fallback: some repos previously named the secret SELF_APPROVE_TOKEN
+          TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN || secrets.SELF_APPROVE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           PR_NUMBER: ${{ steps.validate.outputs.pr_number }}
         run: |
           if [ -z "$TOKEN" ]; then
-            echo "SELF_APPROVE_TOKEN secret not set" >&2
-            exit 1
+            echo "🔒 No self-approve token available (BOT_SELF_APPROVE_TOKEN or SELF_APPROVE_TOKEN). Skipping approval." >&2
+            echo "Ensure a repo secret named 'BOT_SELF_APPROVE_TOKEN' (preferred) or 'SELF_APPROVE_TOKEN' exists (Settings → Secrets & variables → Actions) and contains a valid PAT." >&2
+            # Exit with 78 to indicate neutral/skip rather than a hard failure
+            exit 78
           fi
           echo "Posting approval for PR #${PR_NUMBER} as ${OWNER}"
           # Retry up to 3 times if the API call fails; log response body and HTTP code for debugging
@@ -120,12 +123,17 @@ jobs:
       - name: Merge PR via API (optional)
         if: ${{ steps.validate.outputs.merge == 'yes' }}
         env:
-          TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN }}
+          TOKEN: ${{ secrets.BOT_SELF_APPROVE_TOKEN || secrets.SELF_APPROVE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           PR_NUMBER: ${{ steps.validate.outputs.pr_number }}
         run: |
           echo "Merging PR #${PR_NUMBER}"
+          if [ -z "$TOKEN" ]; then
+            echo "🔒 No self-approve token available (BOT_SELF_APPROVE_TOKEN or SELF_APPROVE_TOKEN). Skipping merge." >&2
+            echo "Ensure a repo secret named 'BOT_SELF_APPROVE_TOKEN' (preferred) or 'SELF_APPROVE_TOKEN' exists (Settings → Secrets & variables → Actions) and contains a valid PAT." >&2
+            exit 78
+          fi
           # Retry merge up to 3 times and log response for debugging
           m=0
           mcode=0
