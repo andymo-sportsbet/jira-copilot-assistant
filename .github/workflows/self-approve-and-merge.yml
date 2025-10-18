@@ -11,8 +11,9 @@ on:
 
 jobs:
   self-approve:
-    # only run for pull request comments
-    if: github.event.issue.pull_request != null
+    # Run for pull request related events: either an issue_comment on a PR
+    # (github.event.issue.pull_request) or a pull_request_target event
+    if: github.event.pull_request != null || (github.event.issue != null && github.event.issue.pull_request != null)
     runs-on: ubuntu-latest
     steps:
       - name: Capture commenter and body
