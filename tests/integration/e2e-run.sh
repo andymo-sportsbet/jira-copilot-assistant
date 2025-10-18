@@ -2,10 +2,11 @@
 
 set -euo pipefail
 
-# scripts/e2e-run.sh
+# tests/integration/e2e-run.sh
 # Simple end-to-end runner: create -> fetch -> groom -> close
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# When run from tests/integration, repo root is two levels up
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP_DIR="$ROOT_DIR/.temp"
 mkdir -p "$TMP_DIR"
 
