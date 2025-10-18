@@ -11,8 +11,7 @@ on:
 
 jobs:
   self-approve:
-    # only run for pull request comments
-    if: github.event.issue.pull_request != null
+    # Job always runs for configured events; the Validate step decides whether to act
     runs-on: ubuntu-latest
     steps:
       - name: Capture commenter and body
