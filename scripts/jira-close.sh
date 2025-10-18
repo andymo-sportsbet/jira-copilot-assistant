@@ -66,6 +66,31 @@ EOF
 
 # Main function
 main() {
+    # Load dry-run helper early so we can short-circuit network calls
+    # shellcheck disable=SC1091
+    source "${SCRIPT_DIR}/lib/dryrun.sh"
+    parse_dry_run_arg "$@"
+
+    # If dry-run requested, create a small artifact and exit without contacting JIRA
+    if is_dry_run; then
+        local ticket_arg="${1:-}"
+        local temp_dir="$(cd "${SCRIPT_DIR}/.." && pwd)/.temp"
+        mkdir -p "$temp_dir"
+        if [[ -z "$ticket_arg" ]]; then
+            echo "Dry-run: would close a ticket (no ticket key provided)."
+            exit 0
+        fi
+        cat > "$temp_dir/${ticket_arg}-close.json" <<EOF
+{
+  "action": "close",
+  "ticket": "${ticket_arg}",
+  "comment": "Would add completion summary and transition to Done (dry-run)."
+}
+EOF
+        echo "Dry-run artifact written: $temp_dir/${ticket_arg}-close.json"
+        exit 0
+    fi
+
     # Check dependencies
     check_dependencies || exit 1
     

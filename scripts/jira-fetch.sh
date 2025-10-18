@@ -1,3 +1,13 @@
+## Dry-run support
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/dryrun.sh"
+parse_dry_run_arg "$@"
+if is_dry_run; then
+  echo "Dry-run: would fetch JIRA issue (no network calls)." >&2
+  exit 0
+fi
+
+# Main
 #!/usr/bin/env bash
 set -euo pipefail
 

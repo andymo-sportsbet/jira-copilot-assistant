@@ -55,6 +55,7 @@ SEARCH_TEXT=""
 PROJECT_KEY="RVV"
 ADDITIONAL_FILTER=""
 OUTPUT_FILE=""
+DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -77,6 +78,10 @@ while [[ $# -gt 0 ]]; do
         -o|--output)
             OUTPUT_FILE="$2"
             shift 2
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
             ;;
         -h|--help)
             usage
@@ -109,7 +114,12 @@ if [[ -n "$EPIC_KEY" ]]; then
     echo ""
     
     # Search for tickets under epic
-    search_results=$(jira_search_by_epic "$EPIC_KEY" "$ADDITIONAL_FILTER")
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "Dry-run: would search for tickets under epic $EPIC_KEY"
+        search_results='[]'
+    else
+        search_results=$(jira_search_by_epic "$EPIC_KEY" "$ADDITIONAL_FILTER")
+    fi
     
 elif [[ -n "$SEARCH_TEXT" ]]; then
     # Search by text
@@ -117,7 +127,12 @@ elif [[ -n "$SEARCH_TEXT" ]]; then
     info "Search Text: $SEARCH_TEXT"
     echo ""
     
-    search_results=$(jira_search_by_text "$PROJECT_KEY" "$SEARCH_TEXT" "$ADDITIONAL_FILTER")
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "Dry-run: would search by text '$SEARCH_TEXT' in project $PROJECT_KEY"
+        search_results='[]'
+    else
+        search_results=$(jira_search_by_text "$PROJECT_KEY" "$SEARCH_TEXT" "$ADDITIONAL_FILTER")
+    fi
 fi
 
 # Display results

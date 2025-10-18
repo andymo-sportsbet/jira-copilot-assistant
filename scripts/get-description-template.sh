@@ -141,6 +141,15 @@ main() {
     local ticket_id="${1:-}"
     local print_only=false
     local use_ai_suggest=false
+    local DRY_RUN=0
+
+    # Parse dry-run early from args so we can short-circuit network calls
+    for a in "$@"; do
+        if [[ "$a" == "--dry-run" ]]; then
+            DRY_RUN=1
+            break
+        fi
+    done
     
     if [[ "$ticket_id" == "--help" ]] || [[ "$ticket_id" == "-h" ]] || [[ -z "$ticket_id" ]]; then
         show_usage
@@ -167,6 +176,22 @@ main() {
     
     info "Fetching ticket details for ${ticket_id}..."
     
+    # If dry-run, skip network call and write artifact for tests
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        info "Dry-run: would fetch ticket ${ticket_id} from JIRA (no network calls)."
+        TEMP_DIR="${SCRIPT_DIR}/../.temp"
+        mkdir -p "$TEMP_DIR"
+        cat > "$TEMP_DIR/${ticket_id}-template.json" <<EOF
+{
+  "ticket_id": "${ticket_id}",
+  "action": "select_template",
+  "note": "Dry-run: would fetch ticket and select template based on issue type or AI suggestion"
+}
+EOF
+        echo "Dry-run artifact written: $TEMP_DIR/${ticket_id}-template.json"
+        exit 0
+    fi
+
     # Fetch ticket data
     local ticket_data=$(jira_get_issue "$ticket_id")
     

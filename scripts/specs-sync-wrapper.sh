@@ -7,12 +7,14 @@ set -euo pipefail
 SPACE=""
 PAGES=""
 OUTPUT="specs"
+DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --space) SPACE="$2"; shift 2 ;;
     --pages) PAGES="$2"; shift 2 ;;
     --output) OUTPUT="$2"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
     --help) echo "Usage: $0 [--space SPACE] [--pages PAGE_IDS] [--output OUTPUT]"; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -30,11 +32,19 @@ if [[ -n "$PAGES" ]]; then
   IFS=',' read -ra IDS <<< "$PAGES"
   for id in "${IDS[@]}"; do
     echo "Converting page id $id..."
-    ./scripts/confluence-to-spec.sh --page-id "$id" --output "$OUTPUT" || echo "Failed to convert page $id" >&2
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "Dry-run: would convert page id $id -> $OUTPUT"
+    else
+      ./scripts/confluence-to-spec.sh --page-id "$id" --output "$OUTPUT" || echo "Failed to convert page $id" >&2
+    fi
   done
 else
   echo "Syncing space $SPACE to $OUTPUT..."
-  ./scripts/confluence-to-spec.sh --space "$SPACE" --output "$OUTPUT"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "Dry-run: would sync space $SPACE -> $OUTPUT"
+  else
+    ./scripts/confluence-to-spec.sh --space "$SPACE" --output "$OUTPUT"
+  fi
 fi
 
 # Detect git changes

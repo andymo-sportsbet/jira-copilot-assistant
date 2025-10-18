@@ -63,6 +63,11 @@ URL=""
 PAGE_ID=""
 OUTPUT_PATH=""
 SPACE=""
+DRY_RUN=0
+
+# Load dry-run helper early
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/dryrun.sh"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -70,22 +75,10 @@ while [[ $# -gt 0 ]]; do
             URL="$2"
             shift 2
             ;;
-            --space)
-                SPACE="$2"
-                shift 2
-            # Load dry-run helper
-            # shellcheck disable=SC1091
-            source "$(dirname "${BASH_SOURCE[0]}")/lib/dryrun.sh"
-
-            parse_dry_run_arg "$@"
-
-            # If dry-run, print info and exit early (still create no network artifacts)
-            if is_dry_run; then
-                echo "Dry-run: would fetch confluence page and save spec (no network calls)." >&2
-                exit 0
-            fi
-
-                ;;
+        --space)
+            SPACE="$2"
+            shift 2
+            ;;
         --page-id)
             PAGE_ID="$2"
             shift 2
@@ -106,6 +99,25 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Parse dry-run args (after collecting flags that may include --dry-run)
+parse_dry_run_arg "$@"
+
+if is_dry_run; then
+        echo "Dry-run: skipping Confluence network calls and spec generation. Writing artifact..." >&2
+        TEMP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.temp"
+        mkdir -p "$TEMP_DIR"
+        cat > "$TEMP_DIR/${PAGE_ID:-dryrun}-confluence-to-spec.json" <<EOF
+{
+    "page_id": "${PAGE_ID:-}",
+    "space": "${SPACE:-}",
+    "output": "${OUTPUT_PATH:-}",
+    "note": "Dry-run: would fetch and convert Confluence page to spec"
+}
+EOF
+        echo "Dry-run artifact written: $TEMP_DIR/${PAGE_ID:-dryrun}-confluence-to-spec.json"
+        exit 0
+fi
 
 # Validate environment
 load_env
