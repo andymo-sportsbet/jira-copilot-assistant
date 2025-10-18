@@ -45,3 +45,12 @@ gh run view <run-id> --log
 
 ---
 Last updated: 2025-10-18
+
+## Story points and estimation
+
+- If your team uses story points, add the estimate via the normal workflow or JIRA integration. The repo includes scripts that can assist with AI estimation — consult your team process for when to use them.
+
+## Contact and support
+
+- For permission requests, invite the repository owner or open an issue and tag `@andymo-sportsbet` or the appropriate team.
+- For CI or workflow failures, include the Actions run id and a short description of what failed.
