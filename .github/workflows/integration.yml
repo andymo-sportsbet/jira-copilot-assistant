@@ -20,17 +20,17 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f dev-requirements.txt ]; then pip install -r dev-requirements.txt; fi
 
-      - name: Run pytest integration tests
-        env:
-          RUN_MCP_INTEGRATION: '1'
-        run: |
-          python -m pytest tests/integration -q
-
-      - name: Install Bats
+      - name: Install Bats (fail fast)
         run: |
           sudo apt-get update
           sudo apt-get install -y bats
 
       - name: Run Bats shell tests
         run: |
-          bats tests/bash || true
+          bats tests/bash
+
+      - name: Run pytest integration tests
+        env:
+          RUN_MCP_INTEGRATION: '1'
+        run: |
+          python -m pytest tests/integration -q
