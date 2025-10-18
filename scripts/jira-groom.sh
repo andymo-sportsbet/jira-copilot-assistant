@@ -176,6 +176,7 @@ generate_acceptance_criteria() {
     
     local summary
     summary=$(echo "$ticket_data" | jq -r '.fields.summary')
+    # description is intentionally declared for future use / clarity in generated criteria
     # shellcheck disable=SC2034
     local description
     description=$(echo "$ticket_data" | jq -r '.fields.description.content[0].content[0].text // "No description"' 2>/dev/null || echo "No description")
@@ -624,7 +625,8 @@ main() {
             
             # Display reasoning
             echo "🔍 Analysis:"
-            echo "$reasoning" | sed 's/\\n/\n/g'
+            # Print analysis preserving literal \n sequences produced by the estimator
+            printf "%b\n" "$reasoning"
             echo ""
             echo "Confidence: $confidence"
             echo ""
@@ -690,7 +692,7 @@ main() {
                     fi
                     ;;
                 o|O)
-                    read -p "Enter story points (0.5, 1, 2, 3, 4, 5): " custom_points
+                    read -r -p "Enter story points (0.5, 1, 2, 3, 4, 5): " custom_points
                     if update_story_points "$ticket_key" "$custom_points"; then
                         echo ""
                     fi
@@ -711,8 +713,10 @@ main() {
     local commits
     commits=$(github_search_commits "$ticket_key")
     
-    local pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
-    local commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
+    local pr_count
+    pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
+    local commit_count
+    commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
     
     if [[ "$pr_count" -gt 0 ]]; then
         success "Found $pr_count related PR(s)"
