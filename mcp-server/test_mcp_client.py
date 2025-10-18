@@ -2,15 +2,24 @@
 """Test client for MCP server"""
 import asyncio
 import json
+import os
+import sys
+from pathlib import Path
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
 
 async def test_mcp_server():
     """Test the MCP server by connecting and calling tools"""
     
+    # Use environment override or the current Python executable so tests are environment-agnostic
+    repo_root = Path(__file__).resolve().parents[1]
+    wrapper_py = str(repo_root / 'mcp-server' / 'jira_bash_wrapper.py')
+    python_exec = os.environ.get('MCP_SERVER_PYTHON', sys.executable)
+
     server_params = StdioServerParameters(
-        command="/Users/andym/projects/my-project/jira-copilot-assistant/mcp-server/venv/bin/python",
-        args=["/Users/andym/projects/my-project/jira-copilot-assistant/mcp-server/jira_bash_wrapper.py"],
+        command=python_exec,
+        args=[wrapper_py],
         env=None
     )
     

@@ -17,6 +17,7 @@ def test_wrapper():
     print("=== Testing Jira Bash Wrapper ===\n")
     
     # Initialize wrapper
+    wrapper = None
     try:
         wrapper = JiraBashWrapper()
         print(f"✅ Wrapper initialized")
@@ -24,7 +25,7 @@ def test_wrapper():
         print(f"   Project dir: {wrapper.project_dir}\n")
     except Exception as e:
         print(f"❌ Failed to initialize wrapper: {e}")
-        return False
+        assert False, f"Failed to initialize wrapper: {e}"
     
     # Check scripts exist
     scripts = [
@@ -46,7 +47,7 @@ def test_wrapper():
     
     if not all_found:
         print("\n❌ Some scripts not found!")
-        return False
+        assert False, "Some scripts not found"
     
     print("\n✅ All scripts found!")
     
@@ -63,16 +64,24 @@ def test_wrapper():
         print("⚠️  Script execution attempted")
         print(f"   Output: {result.get('output', '')[:100]}")
         print(f"   Error: {result.get('error', '')[:100]}")
-    
+
     print("\n=== Wrapper Test Complete ===")
     print("\nTo use with MCP:")
     print("1. Update mcp.json to use jira_bash_wrapper.py")
     print("2. Reload VS Code")
     print("3. Ask Copilot: 'Groom ticket RVV-1234'")
-    
-    return True
+
+    # Return None for pytest-friendly behavior
+    return None
 
 
 if __name__ == "__main__":
-    success = test_wrapper()
-    sys.exit(0 if success else 1)
+    try:
+        test_wrapper()
+        sys.exit(0)
+    except AssertionError as e:
+        print(f"Test failed: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(2)
