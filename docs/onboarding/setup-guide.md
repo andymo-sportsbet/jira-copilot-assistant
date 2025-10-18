@@ -123,18 +123,33 @@ cp .env.example .env
 
 **Note**: This same token will be used for both JIRA and Confluence access.
 
-### Step 3: Get GitHub Token (Optional)
+### Step 3: GitHub authentication (Optional, for sync features)
 
-Only needed if you want to use the sync feature:
+You can authenticate GitHub in two ways; prefer option A (safer/easier):
 
-1. **Go to GitHub Settings**:
-   - Visit: https://github.com/settings/tokens
-2. **Generate new token (classic)**:
-   - Click **Generate new token** → **Generate new token (classic)**
+A) Use GitHub CLI (recommended)
+
+1. Install GitHub CLI (`gh`) and run:
+
+```bash
+gh auth login
+# follow the interactive prompts to authenticate
+gh auth status  # verify authentication
+```
+
+This is the recommended approach because it avoids storing long-lived tokens in files and integrates with the user's GitHub account.
+
+B) Personal Access Token (fallback)
+
+Only use a PAT if you can't use `gh auth login`:
+
+1. **Go to GitHub Settings** → https://github.com/settings/tokens
+2. **Generate new token** (choose fine-grained token when possible):
    - Name: "JIRA Copilot Assistant"
-   - Scopes: Select `repo` (full control of private repositories)
-   - Click **Generate token**
-   - **Copy the token**
+   - Scopes: For private repo sync you typically need `repo` (or read-only repo access if you can restrict to that). Prefer fine-grained tokens and minimal scopes.
+   - Click **Generate token** and **copy the token** (you won't see it again).
+
+Paste the token into your `.env` as `GITHUB_TOKEN` only if required for your workflow.
 
 ### Step 4: Configure .env File
 

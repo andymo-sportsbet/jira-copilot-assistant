@@ -1,4 +1,6 @@
 ```markdown
+<!-- Archived: canonical user guide lives at docs/onboarding/user-guide.md -->
+
 User Guide (archived)
 
 This file was moved during docs cleanup. Canonical user docs now live in `docs/onboarding/user-guide.md`.

@@ -3,7 +3,9 @@ Contributor guide (archived)
 
 This file was moved during docs cleanup. Canonical contributor docs now live in `docs/onboarding/contribution-guide.md`.
 
-Original content preserved for history.
+ <!-- Archived: canonical contributor guide lives at docs/onboarding/contribution-guide.md -->
+ 
+ Contributor guide
 
 ---
 
