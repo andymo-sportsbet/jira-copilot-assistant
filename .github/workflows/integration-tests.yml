@@ -23,12 +23,4 @@ jobs:
           echo "Running unit Bats tests"
           bats tests/bash/test_libs.bats
 
-      - name: Run integration tests (mock JIRA)
-        run: |
-          echo "Starting mock JIRA server"
-          nohup python3 scripts/mock_jira.py --port 8765 > mock_jira.log 2>&1 &
-          # wait for mock to be ready
-          sleep 1
-          echo "Running integration Bats tests"
-          export RUN_INTEGRATION_TESTS=1
-          bats tests/bash/test_integration_jira.bats
+      # Integration tests (mock JIRA) removed — repository uses unit tests only
