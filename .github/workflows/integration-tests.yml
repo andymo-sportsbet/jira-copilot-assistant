@@ -1,0 +1,34 @@
+name: Bats tests (unit + integration)
+
+on:
+  push:
+    branches: [ main, master, ci/add-tests-workflow ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats jq
+
+      - name: Run Bats unit tests
+        run: |
+          echo "Running unit Bats tests"
+          bats tests/bash/test_libs.bats
+
+      - name: Run integration tests (mock JIRA)
+        run: |
+          echo "Starting mock JIRA server"
+          nohup python3 scripts/mock_jira.py --port 8765 > mock_jira.log 2>&1 &
+          # wait for mock to be ready
+          sleep 1
+          echo "Running integration Bats tests"
+          export RUN_INTEGRATION_TESTS=1
+          bats tests/bash/test_integration_jira.bats
