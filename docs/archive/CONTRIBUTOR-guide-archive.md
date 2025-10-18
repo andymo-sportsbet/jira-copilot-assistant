@@ -1,4 +1,4 @@
-This file is an archived copy of `docs/contributor-guide.md` moved during cleanup. Keep for history; canonical contributor docs live under `docs/onboard/`.
+This file is an archived copy of `docs/contributor-guide.md` moved during cleanup. Keep for history; canonical contributor docs live under `docs/onboarding/`.
 
 Original filename: contributor-guide.md
 

@@ -1,7 +1,7 @@
 ```markdown
 Contributor guide (archived)
 
-This file was moved during docs cleanup. Canonical contributor docs now live in `docs/onboard/contribution-guide.md`.
+This file was moved during docs cleanup. Canonical contributor docs now live in `docs/onboarding/contribution-guide.md`.
 
 Original content preserved for history.
 

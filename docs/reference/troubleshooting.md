@@ -908,4 +908,4 @@ Your description here...
 
 ---
 
-**Need more help?** Check the [User Guide](onboard/user-guide.md) or create an issue on GitHub.
+**Need more help?** Check the [User Guide](onboarding/user-guide.md) or create an issue on GitHub.

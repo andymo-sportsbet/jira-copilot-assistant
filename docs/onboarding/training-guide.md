@@ -374,7 +374,7 @@ A: Yes! Edit the `generate_acceptance_criteria` function in `jira-groom.sh`.
 
 **Documentation**:
 - 📖 [Setup Guide](setup-guide.md) - Installation & config
- - 📖 [User Guide](onboard/user-guide.md) - All commands & examples
+ - 📖 [User Guide](onboarding/user-guide.md) - All commands & examples
 - 📖 [Troubleshooting](troubleshooting.md) - Common issues
 - 🎬 [Demo Video](demo-script.md) - 5-minute walkthrough
 

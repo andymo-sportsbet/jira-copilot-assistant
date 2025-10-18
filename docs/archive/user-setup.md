@@ -1,7 +1,7 @@
 ```markdown
 User Setup (archived)
 
-This file was moved during docs cleanup. Canonical user setup docs now live in `docs/onboard/user-setup.md`.
+This file was moved during docs cleanup. Canonical user setup docs now live in `docs/onboarding/user-setup.md`.
 
 Original content preserved for history.
 

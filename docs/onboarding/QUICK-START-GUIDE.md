@@ -184,7 +184,7 @@ Check:
 ## 📚 Learn More
 
 - **Full Documentation:** [README.md](../README.md)
-- **User Guide:** [user-guide.md](./onboard/user-guide.md)
+- **User Guide:** [user-guide.md](./onboarding/user-guide.md)
 - **Presentation:** [INTERNAL-RELEASE-PRESENTATION.md](./INTERNAL-RELEASE-PRESENTATION.md)
 
 ## 💬 Get Help

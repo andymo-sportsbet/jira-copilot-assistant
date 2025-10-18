@@ -295,7 +295,7 @@ Quarter 1:
 **Resources:**
 - [Quick Start Guide](./QUICK-START-GUIDE.md)
 - [FAQ](./FAQ.md)
-- [User Guide](./onboard/user-guide.md)
+- [User Guide](./onboarding/user-guide.md)
 - [Presentation](./INTERNAL-RELEASE-PRESENTATION.md)
 
 **Support:**
