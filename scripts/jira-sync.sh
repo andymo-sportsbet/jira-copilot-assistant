@@ -25,6 +25,13 @@ show_help() {
     cat << EOF
 Usage: $(basename "$0") [OPTIONS]
 
+    # Load dry-run helper
+    # shellcheck disable=SC1091
+    source "$(dirname "${BASH_SOURCE[0]}")/lib/dryrun.sh"
+
+    # Parse dry-run arg early
+    parse_dry_run_arg "$@"
+
 Sync GitHub repositories with JIRA ticket statuses by:
   1. Scanning recent PRs and commits for JIRA keys
   2. Determining appropriate status based on PR state
@@ -51,6 +58,10 @@ Status Transitions:
   - Closed PR (not merged) → No change
 
 Environment Variables:
+    if is_dry_run; then
+        echo "Dry-run: would sync JIRA from GitHub (no network calls)." >&2
+        exit 0
+    fi
   JIRA_BASE_URL      Your JIRA instance URL
   JIRA_EMAIL         Your JIRA email
   JIRA_TOKEN         JIRA API token

@@ -73,6 +73,18 @@ while [[ $# -gt 0 ]]; do
             --space)
                 SPACE="$2"
                 shift 2
+            # Load dry-run helper
+            # shellcheck disable=SC1091
+            source "$(dirname "${BASH_SOURCE[0]}")/lib/dryrun.sh"
+
+            parse_dry_run_arg "$@"
+
+            # If dry-run, print info and exit early (still create no network artifacts)
+            if is_dry_run; then
+                echo "Dry-run: would fetch confluence page and save spec (no network calls)." >&2
+                exit 0
+            fi
+
                 ;;
         --page-id)
             PAGE_ID="$2"
