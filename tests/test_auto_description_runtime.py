@@ -10,7 +10,7 @@ TEMP_DIR = os.path.join(REPO_ROOT, '.temp')
 
 def test_auto_description_dry_run_creates_temp_file(tmp_path):
     # Use a fake ticket key to avoid needing JIRA access
-    ticket = 'TEST-DRY-1'
+    ticket = 'TST-1'
 
     # Ensure clean temp dir
     if os.path.exists(TEMP_DIR):
@@ -42,4 +42,3 @@ def test_auto_description_dry_run_creates_temp_file(tmp_path):
     # Cleanup
     if os.path.exists(TEMP_DIR):
         shutil.rmtree(TEMP_DIR)
-*** End Patch
