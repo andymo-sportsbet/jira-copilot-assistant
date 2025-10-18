@@ -20,9 +20,9 @@ Find your MCP config file and update:
   "servers": {
     "jira-local": {
       "type": "stdio",
-      "command": "/Users/andym/projects/my-project/jira-copilot-assistant/mcp-server/venv/bin/python",
-      "args": ["/Users/andym/projects/my-project/jira-copilot-assistant/mcp-server/jira_bash_wrapper.py"],
-      "cwd": "/Users/andym/projects/my-project/jira-copilot-assistant"
+      "command": "/path/to/jira-copilot-assistant/mcp-server/venv/bin/python",
+      "args": ["/path/to/jira-copilot-assistant/mcp-server/jira_bash_wrapper.py"],
+      "cwd": "/path/to/jira-copilot-assistant"
     }
   }
 }
