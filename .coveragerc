@@ -1,0 +1,15 @@
+[run]
+omit =
+    tests/*
+    */__init__.py
+    mcp-server/test_*.py
+    mcp-server/*test*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.: 
+    @abc.abstractmethod
+
+[html]
+directory = coverage_html_report
