@@ -7,7 +7,7 @@ Use Claude/Copilot in VS Code to generate intelligent, context-aware content for
 2. **Technical Guide** - Detailed implementation guide as a comment
 
 ## Why This Approach?
-
+ 
 ✅ **No API costs** - Uses your existing Claude/Copilot subscription  
 ✅ **Better context** - AI has full workspace context  
 ✅ **Review before sending** - You can edit content before posting  
