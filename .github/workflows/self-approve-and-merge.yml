@@ -88,8 +88,10 @@ jobs:
           PR_NUMBER: ${{ steps.validate.outputs.pr_number }}
         run: |
           if [ -z "$TOKEN" ]; then
-            echo "SELF_APPROVE_TOKEN secret not set" >&2
-            exit 1
+            echo "🔒 BOT_SELF_APPROVE_TOKEN repository secret not set or unavailable in this event context. Skipping approval." >&2
+            echo "Ensure a repo secret named 'BOT_SELF_APPROVE_TOKEN' exists (Settings → Secrets & variables → Actions) or run via pull_request_target context." >&2
+            # Exit with 78 to indicate neutral/skip rather than a hard failure
+            exit 78
           fi
           echo "Posting approval for PR #${PR_NUMBER} as ${OWNER}"
           # Retry up to 3 times if the API call fails; log response body and HTTP code for debugging
@@ -126,6 +128,11 @@ jobs:
           PR_NUMBER: ${{ steps.validate.outputs.pr_number }}
         run: |
           echo "Merging PR #${PR_NUMBER}"
+          if [ -z "$TOKEN" ]; then
+            echo "🔒 BOT_SELF_APPROVE_TOKEN repository secret not set or unavailable in this event context. Skipping merge." >&2
+            echo "Ensure a repo secret named 'BOT_SELF_APPROVE_TOKEN' exists (Settings → Secrets & variables → Actions) or run via pull_request_target context." >&2
+            exit 78
+          fi
           # Retry merge up to 3 times and log response for debugging
           m=0
           mcode=0
