@@ -20,9 +20,9 @@ Find your MCP config file and update:
   "servers": {
     "jira-local": {
       "type": "stdio",
-      "command": "/Users/andym/projects/my-project/jira-copilot-assistant/mcp-server/venv/bin/python",
-      "args": ["/Users/andym/projects/my-project/jira-copilot-assistant/mcp-server/jira_bash_wrapper.py"],
-      "cwd": "/Users/andym/projects/my-project/jira-copilot-assistant"
+      "command": "/path/to/jira-copilot-assistant/mcp-server/venv/bin/python",
+      "args": ["/path/to/jira-copilot-assistant/mcp-server/jira_bash_wrapper.py"],
+      "cwd": "/path/to/jira-copilot-assistant"
     }
   }
 }
@@ -44,177 +44,235 @@ Should see: groom_ticket, create_ticket, fetch_confluence_page, etc.
 ## Usage Examples
 
 ### Grooming
+````markdown
+# Quick Start — JIRA Copilot Assistant
 
-**Basic:**
+This repository exposes your existing bash-based JIRA/Confluence helpers to GitHub Copilot via an MCP (Model Context Protocol) wrapper.
+
+Audience: engineers who want AI-assisted Jira grooming, ticket creation, Confluence export, and story-point estimation using the existing bash tooling.
+
+Architecture: Copilot Chat → MCP → Python wrapper → Bash scripts → Jira / Confluence
+
+--
+
+## Quick 5-minute setup
+
+Follow these quick steps from the repository root (`jira-copilot-assistant`).
+
+1) Clone (if needed)
+
+```bash
+cd ~/projects
+git clone https://github.com/andymo-sportsbet/jira-copilot-assistant.git
+cd jira-copilot-assistant
+```
+
+2) Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env and add required variables (see below)
+```
+
+Minimum required in `.env`:
+
+```
+JIRA_BASE_URL=https://sportsbet.atlassian.net
+JIRA_EMAIL=your.email@sportsbet.com.au
+JIRA_API_TOKEN=<your_api_token>
+JIRA_PROJECT=YOUR_PROJECT
+```
+
+Optional but recommended:
+
+```
+GITHUB_TOKEN=<your_github_token>
+GITHUB_ORG=sportsbet
+JIRA_STORY_POINTS_FIELD=customfield_10102
+```
+
+3) Make scripts executable (if not already):
+
+```bash
+chmod +x scripts/*.sh scripts/lib/*.sh
+```
+
+4) (Optional) Set up MCP wrapper for Copilot automation
+
+```bash
+cd mcp-server
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Add/update your MCP config (example below) and point VS Code Copilot to the wrapper
+```
+
+Example MCP server config (update paths to your checkout):
+
+```json
+{
+  "servers": {
+    "jira-local": {
+      "type": "stdio",
+      "command": "/path/to/jira-copilot-assistant/mcp-server/venv/bin/python",
+      "args": ["/path/to/jira-copilot-assistant/mcp-server/jira_bash_wrapper.py"],
+      "cwd": "/path/to/jira-copilot-assistant"
+    }
+  }
+}
+```
+
+Reload VS Code (Developer: Reload Window) after updating MCP settings.
+
+--
+
+## Most common commands (CLI)
+
+Use the original bash scripts directly for quick checks. Examples:
+
+Groom a ticket (adds acceptance criteria):
+
+```bash
+./scripts/jira-groom.sh PROJ-123
+```
+
+Estimate a ticket (AI-assisted):
+
+```bash
+./scripts/jira-groom.sh PROJ-123 --estimate --team-scale
+```
+
+Create a ticket:
+
+```bash
+./scripts/jira-create.sh Task "Upgrade Spring Boot to 3.2"
+```
+
+Fetch a Confluence page and save as spec:
+
+```bash
+./scripts/confluence-to-spec.sh "https://.../pages/12345" --output specs/feature/spec.md
+```
+
+Find related tickets:
+
+```bash
+./scripts/find-related-tickets.sh PROJ-123
+```
+
+Close a ticket with a comment:
+
+```bash
+./scripts/jira-close.sh PROJ-123 --comment "Completed successfully"
+```
+
+--
+
+## Using Copilot (MCP) — natural language examples
+
+After the MCP server is running and Copilot is configured, try these prompts in Copilot Chat:
+
+Grooming examples
+
 ```
 "Groom ticket RVV-1234"
 ```
-→ Runs: `./scripts/jira-groom.sh RVV-1234`
+→ runs `./scripts/jira-groom.sh RVV-1234`
 
-**With Auto Template Selection:** ✨ NEW
-```
-"Groom RVV-1234 with auto template"
-```
-→ Automatically selects the right prompt template:
-- Tech Debt: For upgrades, migrations (Spring Boot, Java)
-- Spike: For research, investigation, POC
-- Bug: For defects, errors, broken functionality
-- Story: For features, enhancements
-
-The template is exposed as an MCP resource that Copilot can read!
-
-**With AI Estimation:**
 ```
 "Groom RVV-1234 with AI estimation"
 ```
-→ Runs: `./scripts/jira-groom.sh RVV-1234 --estimate`
+→ runs `./scripts/jira-groom.sh RVV-1234 --estimate`
 
-**With Team Scale (0.5-5):**
 ```
 "Groom RVV-1234 with estimation using team scale"
 ```
-→ Runs: `./scripts/jira-groom.sh RVV-1234 --estimate --team-scale`
+→ runs `./scripts/jira-groom.sh RVV-1234 --estimate --team-scale`
 
-**With Spec File:**
-```
-"Groom RVV-1234 using spec file /path/to/spec.md"
-```
-→ Runs: `./scripts/jira-groom.sh RVV-1234 --reference-file /path/to/spec.md`
+Template selection: the wrapper exposes templates (Tech Debt, Spike, Bug, Story) and Copilot can choose the right one based on the ticket text.
 
-**With Confluence Page:**
-```
-"Groom RVV-1234 with Confluence page https://confluence/pages/123"
-```
-→ Runs:
-1. `./scripts/confluence-to-spec.sh https://... /tmp/temp.md`
-2. `./scripts/jira-groom.sh RVV-1234 --reference-file /tmp/temp.md`
+Confluence & Spec workflows
 
-**Manual Story Points:**
 ```
-"Set RVV-1234 to 3 story points"
+"Fetch Confluence page https://... and save to specs/feature.md"
 ```
-→ Runs: `./scripts/jira-groom.sh RVV-1234 --points 3`
+→ runs `./scripts/confluence-to-spec.sh` and stores a local spec file that can be used as a reference for grooming.
 
-### Confluence
+--
 
-**Fetch Page:**
-```
-"Fetch Confluence page https://confluence/pages/123456"
-```
-→ Runs: `./scripts/confluence-to-spec.sh https://...`
+## Internals / Available tools
 
-**Save to File:**
-```
-"Fetch Confluence page https://... and save to /specs/feature.md"
-```
-→ Runs: `./scripts/confluence-to-spec.sh https://... /specs/feature.md`
+The MCP wrapper exposes a set of tools that map to the bash scripts. Example mapping:
 
-### Ticket Management
+| Tool | Script |
+|------|--------|
+| groom_ticket | `scripts/jira-groom.sh` |
+| create_ticket | `scripts/jira-create.sh` |
+| fetch_confluence_page | `scripts/confluence-to-spec.sh` |
+| find_related_tickets | `scripts/find-related-tickets.sh` |
+| close_ticket | `scripts/jira-close.sh` |
+| sync_to_confluence | `scripts/confluence-to-jira.sh` |
 
-**Create Ticket:**
-```
-"Create a task for upgrading Spring Boot to 3.2"
-```
-→ Runs: `./scripts/jira-create.sh Task "Upgrade Spring Boot to 3.2"`
-
-**Find Related:**
-```
-"Find tickets related to RVV-1234"
-```
-→ Runs: `./scripts/find-related-tickets.sh RVV-1234`
-
-**Close Ticket:**
-```
-"Close RVV-1234 with comment 'Completed successfully'"
-```
-→ Runs: `./scripts/jira-close.sh RVV-1234 --comment "Completed successfully"`
-
-## Available Tools
-
-| Tool | Bash Script | Description |
-|------|------------|-------------|
-| `groom_ticket` | jira-groom.sh | AI acceptance criteria + estimation |
-| `create_ticket` | jira-create.sh | Create Story/Task/Bug/Epic |
-| `fetch_confluence_page` | confluence-to-spec.sh | Download Confluence pages |
-| `find_related_tickets` | find-related-tickets.sh | Search related work |
-| `close_ticket` | jira-close.sh | Close with comment |
-| `sync_to_confluence` | confluence-to-jira.sh | Bidirectional sync |
+--
 
 ## Troubleshooting
 
-### "Tool not found" or "MCP server not responding"
+Tool not found / MCP server not responding
 
-1. Check mcp.json path is correct
-2. Verify Python path: `which python` in venv
-3. Reload VS Code window
-4. Check VS Code Developer Tools console for errors
+1. Verify MCP `mcp.json` path and settings
+2. Ensure the MCP venv python is correct (`which python` inside `mcp-server/venv`)
+3. Reload VS Code and check Developer Tools console for errors
 
-### "Script not found" errors
+Script not found or permission denied
 
-Test bash scripts directly:
 ```bash
-cd /Users/andym/projects/my-project/jira-copilot-assistant
 ./scripts/jira-groom.sh --help
+chmod +x scripts/*.sh
 ```
 
-If bash works but MCP doesn't, issue is in wrapper.
+Authentication failed
 
-### "Permission denied" errors
-
-Make scripts executable:
-```bash
-chmod +x /Users/andym/projects/my-project/jira-copilot-assistant/scripts/*.sh
-```
-
-### Environment variables not loaded
-
-Bash scripts load `.env` automatically. Verify:
-```bash
-cat /Users/andym/projects/my-project/jira-copilot-assistant/.env
-```
-
-Should have: JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, etc.
-
-### Test wrapper directly
+Check your `JIRA_API_TOKEN` and test with curl:
 
 ```bash
-cd /Users/andym/projects/my-project/jira-copilot-assistant/mcp-server
-./venv/bin/python test_bash_wrapper.py
+curl -u "${JIRA_EMAIL}:${JIRA_API_TOKEN}" "${JIRA_BASE_URL}/rest/api/3/myself"
 ```
 
-Should show all scripts found and execution working.
+Field cannot be set (Story Points)
 
-## Benefits
+The Story Points field may not be on the edit screen for your project. Either ask your JIRA admin to add it to the relevant screen, or use estimates for planning without writing to JIRA.
 
-✅ **No Code Duplication** - Bash scripts are source of truth  
-✅ **Battle-Tested Logic** - Uses production bash with years of testing  
-✅ **Easy Updates** - Update bash, wrapper automatically uses new features  
-✅ **Simple** - Only 400 lines of Python vs 3000+ reimplementation  
-✅ **Debuggable** - Can test bash scripts independently  
-✅ **All Features** - Every bash option available through Copilot  
+--
 
-## File Reference
+## Pro tips
+
+- Mention a reference ticket or spec to reduce AI estimation uncertainty (e.g., "Follow same approach as DM adapter Spring Boot upgrade").
+- Use interactive mode when prompted: `a` = accept estimate, `o` = override, `s` = skip updating JIRA.
+- Batch estimate tickets via a shell loop for sprint planning.
+
+--
+
+## Files & structure
 
 ```
 jira-copilot-assistant/
-├── .env                         # Environment (shared)
-├── scripts/                     # Source of truth
-│   ├── jira-groom.sh           # ⭐ Main grooming
-│   ├── jira-create.sh          # Ticket creation
-│   ├── confluence-to-spec.sh   # Confluence fetch
-│   ├── find-related-tickets.sh # Related search
-│   ├── jira-close.sh           # Close tickets
-│   └── lib/*.sh                # Libraries
-└── mcp-server/
-    ├── jira_bash_wrapper.py    # ⭐ MCP wrapper (USE THIS)
-    ├── test_bash_wrapper.py    # Validation
-    └── venv/                   # Python env
+├── .env               # Environment (copy from .env.example)
+├── scripts/           # Bash scripts (source of truth)
+├── tests/             # Unit and integration tests
+└── mcp-server/        # MCP wrapper and validation
 ```
 
-## Next Steps
+--
 
-1. ✅ Wrapper tested and working
-2. ⏭️ Update mcp.json with wrapper path
-3. ⏭️ Reload VS Code
-4. ⏭️ Ask Copilot: "Groom ticket RVV-1234"
-5. 🎉 Enjoy AI-powered Jira workflows!
+## Next steps
+
+1. Configure `.env` with your Jira credentials
+2. (Optional) Set up MCP in `mcp-server/` and point VS Code Copilot to it
+3. Try: `./scripts/jira-groom.sh PROJ-123 --estimate --team-scale`
+
+---
+
+*JIRA Copilot Assistant — Quick Start*
+
+````
