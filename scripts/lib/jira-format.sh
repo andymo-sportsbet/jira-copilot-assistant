@@ -6,7 +6,7 @@
 # Helper: process inline formatting (bold, inline code)
 process_inline_formatting() {
     local text="$1"
-    local result='[]'
+    # placeholder for parsed inline result (returned by python fallback)
     
     # Simple state machine to parse inline formatting
     # For now, use a Python one-liner for robust parsing
@@ -46,8 +46,7 @@ print(json.dumps(result))
 
 markdown_to_jira_adf() {
     local markdown_text="$1"
-    echo "[DEBUG] markdown_to_jira_adf input markdown:" >&2
-    echo "$markdown_text" >&2
+    # Debug logging removed
     local content='[]'
     local in_list=false
     local list_items='[]'
@@ -98,7 +97,8 @@ markdown_to_jira_adf() {
             
             local level=${#BASH_REMATCH[1]}
             local text=${BASH_REMATCH[2]}
-            local inline_content=$(process_inline_formatting "$text")
+            local inline_content
+            inline_content=$(process_inline_formatting "$text")
             content=$(echo "$content" | jq --argjson lvl "$level" --argjson inline "$inline_content" '. += [{"type":"heading","attrs":{"level":($lvl|tonumber)},"content":$inline}]')
             continue
         fi
@@ -106,7 +106,8 @@ markdown_to_jira_adf() {
         # bullet list item
         if [[ "$line" =~ ^[-\*][[:space:]]+(.+)$ ]]; then
             local item_text="${BASH_REMATCH[1]}"
-            local inline_content=$(process_inline_formatting "$item_text")
+            local inline_content
+            inline_content=$(process_inline_formatting "$item_text")
             in_list=true
             list_items=$(echo "$list_items" | jq --argjson inline "$inline_content" '. += [{"type":"listItem","content":[{"type":"paragraph","content":$inline}]}]')
             continue
@@ -120,7 +121,8 @@ markdown_to_jira_adf() {
         fi
 
         # paragraph with inline formatting
-        local inline_content=$(process_inline_formatting "$line")
+        local inline_content
+        inline_content=$(process_inline_formatting "$line")
         content=$(echo "$content" | jq --argjson inline "$inline_content" '. += [{"type":"paragraph","content":$inline}]')
     done <<< "$markdown_text"
 
@@ -131,7 +133,6 @@ markdown_to_jira_adf() {
 
     local adf_output
     adf_output=$(jq -n --argjson content "$content" '{type:"doc",version:1,content:$content}')
-    echo "[DEBUG] markdown_to_jira_adf output ADF:" >&2
-    echo "$adf_output" >&2
+    # Debug logging removed
     echo "$adf_output"
 }
