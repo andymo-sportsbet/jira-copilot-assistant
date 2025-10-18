@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9, 3.10, 3.11]
+        # Use stable supported Python versions (avoid alpha or unsupported versions on Ubuntu runners)
+        python-version: [3.10, 3.11, 3.12]
 
     steps:
       - name: Checkout
