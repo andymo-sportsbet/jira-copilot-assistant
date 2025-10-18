@@ -322,7 +322,7 @@ The project includes `.github/copilot-instructions.md` to teach GitHub Copilot a
 
 Now that setup is complete:
 
-1. **Read the [User Guide](user-guide.md)** - Learn all commands and workflows
+1. **Read the [User Guide](onboard/user-guide.md)** - Learn all commands and workflows
 2. **Try the examples** - Create, groom, close tickets
 3. **Customize as needed** - Adjust scripts for your workflow
 4. **Report issues** - See [Troubleshooting Guide](troubleshooting.md)
@@ -398,7 +398,7 @@ Or combine in one line:
 ## Need Help?
 
 - **Troubleshooting**: See [troubleshooting.md](troubleshooting.md)
-- **Usage Examples**: See [user-guide.md](user-guide.md)
+- **Usage Examples**: See [user-guide.md](onboard/user-guide.md)
 - **Project Issues**: Check GitHub Issues
 - **JIRA API Docs**: https://developer.atlassian.com/cloud/jira/platform/rest/v3/
 

@@ -7,6 +7,8 @@
 
 This folder contains everything you need for a successful internal rollout of JIRA Copilot Assistant at Sportsbet.
 
+> Note: Contributor and user-facing quick-start docs have been consolidated under `docs/onboard/`.
+
 ---
 
 ## 🎯 For Presenters & Leaders
@@ -89,7 +91,7 @@ This folder contains everything you need for a successful internal rollout of JI
 
 ---
 
-### 6. [user-guide.md](./user-guide.md)
+### 6. [user-guide.md](./onboard/user-guide.md)
 **Use for:** Comprehensive reference  
 **Duration:** 30-60 minutes to read  
 **Audience:** Power users, admins
@@ -288,7 +290,7 @@ This folder contains everything you need for a successful internal rollout of JI
 ### For Developers
 - ⚡ [Quick Start Guide](./QUICK-START-GUIDE.md) - Get started in 5 minutes
 - � [MCP Quick Start](../mcp-server/QUICK-START.md) - AI automation with Copilot ✨ NEW
-- �📖 [User Guide](./user-guide.md) - Complete reference
+- �📖 [User Guide](./onboard/user-guide.md) - Complete reference
 - ❓ [FAQ](./FAQ.md) - Common questions
 
 ### For Business Analysts
