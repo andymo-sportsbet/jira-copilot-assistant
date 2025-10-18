@@ -30,12 +30,11 @@ Build a Copilot-powered JIRA workflow assistant using **Custom Instructions + Sh
 ### Key Innovation
 - **Zero Extension Development**: Leverage Copilot's built-in context awareness
 - **Git-Based Distribution**: Team gets features automatically via `git pull`
-- **User Control**: Review commands before execution (safer than auto-execution)
-- **Instant Adoption**: No marketplace approval or installation required
-
+ - [x] Update docs/onboard/user-guide.md with Confluence workflow
+ - [x] Update docs/onboard/user-guide.md with Confluence workflow
+ 
 ### Scope
 **IN SCOPE**:
-- ✅ Create JIRA tickets from spec files
 - ✅ Enhance tickets with AI-generated acceptance criteria
 - ✅ Close tickets with AI-generated summaries
 - ✅ Sync GitHub repos with JIRA ticket statuses

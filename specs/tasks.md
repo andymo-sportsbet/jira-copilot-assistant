@@ -308,7 +308,7 @@ Create comprehensive documentation for setup, usage, and troubleshooting.
 **Deliverables**:
 - README.md
 - docs/setup-guide.md
-- docs/user-guide.md
+- docs/onboard/user-guide.md
 - docs/troubleshooting.md
 - .env.example
 
@@ -639,7 +639,10 @@ Update Copilot instructions to support Confluence integration with natural langu
 - [x] Add example interactions
 - [x] Document Confluence-specific extraction logic
 - [x] Update README.md with Confluence examples
-- [x] Update docs/user-guide.md with Confluence workflow
+ - [x] Update docs/onboard/user-guide.md with Confluence workflow
+ 
+ - [x] Ensure all documentation is up to date
+ - [x] Review onboarding process for new team members
 
 **Implementation**:
 Add to `.github/copilot-instructions.md`:

@@ -466,7 +466,7 @@ JIRA_STORY_POINTS_FIELD=customfield_10102
 
 **Documentation:**
 - 📖 [README.md](../README.md) - Quick start guide
-- 📚 [User Guide](./user-guide.md) - Comprehensive manual
+ - 📚 [User Guide](./onboarding/user-guide.md) - Comprehensive manual
 - 🔧 [Configuration Guide](../README.md#configuration) - Setup instructions
 - 📊 [Team Estimation Spec](../specs/001-user-authentication-system/team-story-points-estimation-spec.md) - Estimation methodology
 

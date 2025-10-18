@@ -2,64 +2,27 @@
 
 **Session Duration**: 45 minutes  
 **Format**: Interactive hands-on workshop  
-**Prerequisites**: VS Code, GitHub Copilot subscription, terminal access
-
----
-
-## 📋 Training Agenda
-
-| Time | Topic | Format |
 |------|-------|--------|
 | 0-5 min | Introduction & Setup Check | Presentation |
-| 5-15 min | Demo: All 4 Commands | Live Demo |
-| 15-30 min | Hands-on Exercise | Interactive |
-| 30-40 min | Advanced Tips & Q&A | Discussion |
-| 40-45 min | Next Steps & Resources | Wrap-up |
-
 ---
 
-## 🎯 Learning Objectives
-
-By the end of this session, participants will be able to:
-
-1. ✅ Create JIRA tickets from specification files using Copilot
 2. ✅ Enhance tickets with acceptance criteria using `jira-groom.sh`
-3. ✅ Close tickets with auto-generated summaries
 4. ✅ Sync GitHub PR status to JIRA automatically
 5. ✅ Troubleshoot common issues independently
 
 ---
-
-## 📊 Pre-Training Setup (Send 24 Hours Before)
-
-### Email to Participants:
-
 **Subject**: JIRA Copilot Assistant Training - Setup Required
 
-**Body**:
-```
-Hi Team,
-
 You're registered for the JIRA Copilot Assistant training session on [DATE] at [TIME].
-
 To make the session productive, please complete these setup steps BEFORE the session:
 
 1. **Install jq** (JSON parser):
    - macOS: brew install jq
    - Linux: sudo apt-get install jq
    - Verify: jq --version
-
-2. **Clone the repository**:
-   git clone <repo-url> ~/jira-copilot-assistant
-   cd ~/jira-copilot-assistant
-
 3. **Get your JIRA API token**:
    - Go to: https://id.atlassian.com/manage-profile/security/api-tokens
-   - Create token named "JIRA Copilot Assistant"
-   - Save it somewhere safe (you'll need it during training)
-
 4. **Optional - GitHub CLI** (for sync features):
-   brew install gh
    gh auth login
 
 5. **Verify GitHub Copilot** is active in VS Code
@@ -93,10 +56,7 @@ See you at the session!
 **After**:
 - ✅ Stay in VS Code/terminal
 - ✅ Copilot extracts details automatically
-- ✅ Auto-sync from GitHub PRs
 - ✅ Standardized ticket format
-
-### Slide 3: The Solution
 
 **4 Simple Scripts**:
 1. `jira-create.sh` - Create tickets
@@ -414,7 +374,7 @@ A: Yes! Edit the `generate_acceptance_criteria` function in `jira-groom.sh`.
 
 **Documentation**:
 - 📖 [Setup Guide](setup-guide.md) - Installation & config
-- 📖 [User Guide](user-guide.md) - All commands & examples
+ - 📖 [User Guide](onboarding/user-guide.md) - All commands & examples
 - 📖 [Troubleshooting](troubleshooting.md) - Common issues
 - 🎬 [Demo Video](demo-script.md) - 5-minute walkthrough
 

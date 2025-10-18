@@ -337,11 +337,6 @@ Use the ROI calculator in the presentation:
 ## 🎓 Training & Support
 
 ### Where can I learn more?
-- [Quick Start Guide](./QUICK-START-GUIDE.md) - Get started fast
-- [User Guide](./user-guide.md) - Comprehensive manual
-- [Presentation](./INTERNAL-RELEASE-PRESENTATION.md) - Full overview
-- [README](../README.md) - Technical documentation
-
 ### Is there hands-on training?
 Yes! We offer:
 - Weekly office hours (Wednesdays 2-3pm)

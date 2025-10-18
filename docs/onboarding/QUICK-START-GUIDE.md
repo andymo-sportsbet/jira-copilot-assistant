@@ -5,6 +5,8 @@
 
 ## 🚀 Installation
 
+Note: Run the commands from the repository root (`jira-copilot-assistant`) and ensure scripts are executable (see Step 2). If you cloned elsewhere, `cd` into the repo before running the examples.
+
 ### Step 1: Clone Repository
 ```bash
 cd ~/projects
@@ -184,7 +186,7 @@ Check:
 ## 📚 Learn More
 
 - **Full Documentation:** [README.md](../README.md)
-- **User Guide:** [user-guide.md](./user-guide.md)
+- **User Guide:** [user-guide.md](./onboarding/user-guide.md)
 - **Presentation:** [INTERNAL-RELEASE-PRESENTATION.md](./INTERNAL-RELEASE-PRESENTATION.md)
 
 ## 💬 Get Help

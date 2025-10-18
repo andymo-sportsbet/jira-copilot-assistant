@@ -655,7 +655,7 @@ jira-copilot-assistant/
 │       └── utils.sh               # ✅ Utilities & output
 ├── docs/
 │   ├── setup-guide.md             # ✅ Complete setup instructions
-│   ├── user-guide.md              # ✅ Usage examples & workflows
+│   ├── onboard/user-guide.md      # ✅ Usage examples & workflows
 │   └── troubleshooting.md         # ✅ Common issues & solutions
 ├── .env.example                   # Environment template
 ├── README.md                      # This file
@@ -671,7 +671,7 @@ jira-copilot-assistant/
 | Document | Description |
 |----------|-------------|
 | **[Setup Guide](docs/setup-guide.md)** | Installation, prerequisites, configuration |
-| **[User Guide](docs/user-guide.md)** | Commands, workflows, examples, best practices |
+| **[User Guide](docs/onboard/user-guide.md)** | Commands, workflows, examples, best practices |
 | **[Troubleshooting](docs/troubleshooting.md)** | Common errors, solutions, FAQ |
 | **[Copilot Instructions](.github/copilot-instructions.md)** | How Copilot suggests commands |
 
@@ -725,7 +725,7 @@ jira-copilot-assistant/
 ### 🚧 Epic 3: Documentation & Launch (3 SP) - IN PROGRESS
 
 - [x] **docs/setup-guide.md** ✅ Complete
-- [x] **docs/user-guide.md** ✅ Complete
+- [x] **docs/onboard/user-guide.md** ✅ Complete
 - [x] **docs/troubleshooting.md** ✅ Complete
 - [ ] Demo video script
 - [ ] Team training materials

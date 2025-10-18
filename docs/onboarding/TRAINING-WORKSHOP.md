@@ -292,9 +292,10 @@ Quarter 1:
 5. ✅ Help teammates get set up
 
 **Resources:**
+**Resources:**
 - [Quick Start Guide](./QUICK-START-GUIDE.md)
 - [FAQ](./FAQ.md)
-- [User Guide](./user-guide.md)
+- [User Guide](./onboarding/user-guide.md)
 - [Presentation](./INTERNAL-RELEASE-PRESENTATION.md)
 
 **Support:**

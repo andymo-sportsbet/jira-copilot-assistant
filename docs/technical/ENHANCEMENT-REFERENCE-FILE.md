@@ -373,7 +373,7 @@ Examples:
 
 ### Documentation Updates Needed
 - [x] Update `jira-groom.sh` help message
-- [ ] Update `docs/user-guide.md` with --reference-file examples
+- [ ] Update `docs/onboarding/user-guide.md` with --reference-file examples
 - [ ] Update `README.md` features table
 - [ ] Add to Copilot instructions for natural language triggering
 
