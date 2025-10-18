@@ -392,10 +392,10 @@ The script will show a clear error if the ticket doesn't exist.
 **One-time setup**:
 
 1. Copy the environment template:
-\`\`\`bash
+```bash
 cd jira-copilot-assistant
 cp .env.example .env
-\`\`\`
+```
 
 2. Edit `.env` with your credentials:
 - JIRA_BASE_URL (your Atlassian instance)
@@ -403,11 +403,23 @@ cp .env.example .env
 - JIRA_API_TOKEN (get from https://id.atlassian.com/manage-profile/security/api-tokens)
 - JIRA_PROJECT (your project key, e.g., MSPOC)
 
+2.5. (Optional) Create a local-only test env for safe E2E runs:
+
+```bash
+cd jira-copilot-assistant
+# copy the example into a local, gitignored override
+cp .env.example .env.test.local
+# edit .env.test.local with test credentials (JIRA test instance)
+vim .env.test.local
+```
+
+Note: `.env.test.local` is intended for local end-to-end or integration testing and should be listed in `.gitignore` so credentials are never committed.
+
 3. Then run the create command:
-\`\`\`bash
+```bash
 source .env
 ./scripts/jira-create.sh --summary "..." --description "..."
-\`\`\`
+```
 
 Need help with any step?
 ```
@@ -759,6 +771,18 @@ CONFLUENCE_BASE_URL=https://[domain].atlassian.net/wiki
 JIRA_API_TOKEN=your_token
 # JIRA_API_TOKEN is used for both JIRA and Confluence (same Atlassian account)
 ```
+
+Local integration/E2E notes:
+
+- To run the gated integration tests locally, create a local env override (`.env.test.local`) and then run with the gate variable set:
+
+```bash
+export RUN_INTEGRATION_TESTS=1
+source .env.test.local
+./tests/integration/e2e-run.sh
+```
+
+This ensures live test credentials stay local and tests only run when explicitly requested.
 
 ### Error Handling
 
