@@ -49,6 +49,7 @@ Options:
   --reference-file FILE     Path to spec file with technical implementation details
   --ai-guide FILE          Path to AI-generated technical guide (JIRA ADF JSON format)
   --ai-description FILE    Path to AI-generated enhanced description (plain text)
+    --auto-description       Auto-select template and generate AI description (opt-in)
   --estimate               Enable AI-powered story point estimation (interactive)
   --points N               Manually set story points to N (0.5, 1, 2, 3, 4, 5)
   --auto-estimate          Auto-accept AI estimation without confirmation
@@ -507,6 +508,10 @@ main() {
                 ai_description_file="$2"
                 shift 2
                 ;;
+            --auto-description)
+                auto_description=true
+                shift
+                ;;
             --estimate)
                 enable_estimation=true
                 shift
@@ -553,6 +558,44 @@ main() {
     
     # Validate ticket key format
     validate_ticket_key "$ticket_key" || exit 1
+
+    # If auto description requested, generate AI description and set ai_description_file
+    if [[ "${auto_description:-false}" == "true" ]]; then
+        info "Auto-selecting description template and generating AI description..."
+
+        # Use helper to pick template (ai-suggest) and print the chosen template path
+        local template_path
+        template_path=$("${SCRIPT_DIR}/get-description-template.sh" "$ticket_key" --print --ai-suggest 2>/dev/null || true)
+
+        if [[ -z "$template_path" ]]; then
+            warning "Could not determine template automatically; skipping auto-description"
+        else
+            info "Using template: $template_path"
+
+            # If LLM generation is enabled, try to build description automatically
+            local ai_desc_temp="$temp_dir/${ticket_key}-ai-description.txt"
+            mkdir -p "$temp_dir"
+
+            if [[ "${USE_LLM_GENERATION:-false}" == "true" ]] && [[ -n "${OPENAI_API_KEY:-}" ]]; then
+                info "Generating description using LLM based on template: $template_path"
+                # For simplicity, feed the template to the LLM prompt via generate_with_llm wrapper
+                # The generate_with_llm function expects a spec file; reuse it by calling the template path
+                if generate_with_llm "$template_path" > "$ai_desc_temp" 2>/dev/null; then
+                    info "AI description written to: $ai_desc_temp"
+                    ai_description_file="$ai_desc_temp"
+                else
+                    warning "LLM generation failed; attempting template-based generation"
+                fi
+            fi
+
+            # If ai_description_file not set yet, fall back to template text -> temp file
+            if [[ -z "${ai_description_file:-}" ]]; then
+                info "Using template text as starting point for AI description (saved to $ai_desc_temp)"
+                # Copy template contents to temp file as a starting point
+                cp "$template_path" "$ai_desc_temp" && ai_description_file="$ai_desc_temp"
+            fi
+        fi
+    fi
     
     info "Fetching ticket details for $ticket_key..."
     
