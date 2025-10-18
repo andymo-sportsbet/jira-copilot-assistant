@@ -477,10 +477,10 @@ format_github_context() {
 
 # Main function
 main() {
-    # Check dependencies
-    check_dependencies || exit 1
+    # Note: dependency checks are performed later unless running in dry-run.
     
     # Parse arguments
+    local DRY_RUN=0
     local ticket_key=""
     local reference_file=""
     local ai_guide_file=""
@@ -510,6 +510,10 @@ main() {
                 ;;
             --auto-description)
                 auto_description=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=1
                 shift
                 ;;
             --estimate)
@@ -559,6 +563,10 @@ main() {
     # Validate ticket key format
     validate_ticket_key "$ticket_key" || exit 1
 
+    # Ensure .temp exists for intermediate files (make available to dry-run flows)
+    local temp_dir="${SCRIPT_DIR}/../.temp"
+    mkdir -p "$temp_dir"
+
     # If auto description requested, generate AI description and set ai_description_file
     if [[ "${auto_description:-false}" == "true" ]]; then
         info "Auto-selecting description template and generating AI description..."
@@ -596,12 +604,31 @@ main() {
             fi
         fi
     fi
+
+    # If dry-run, stop here to avoid network calls but keep generated temp files for inspection/tests
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        info "Dry-run enabled: skipping network calls. Temp files are available under: $temp_dir"
+        # Print the ai_description_file path for test harness convenience
+        if [[ -n "${ai_description_file:-}" ]]; then
+            echo "$ai_description_file"
+        fi
+        return 0
+    fi
     
+    # Before making network calls ensure dependencies are present (not needed for dry-run)
+    if [[ "$DRY_RUN" -ne 1 ]]; then
+        check_dependencies || exit 1
+    fi
+
     info "Fetching ticket details for $ticket_key..."
-    
+
     # Fetch ticket details
     local ticket_data
-    if ! ticket_data=$(jira_get_issue "$ticket_key"); then
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        # In dry-run, create a minimal fake ticket_data to exercise local logic
+        ticket_data='{"fields": {"summary": "(dry-run) Test ticket", "description": ""}}'
+    else
+        if ! ticket_data=$(jira_get_issue "$ticket_key"); then
         error "Failed to fetch ticket $ticket_key"
         exit 1
     fi
