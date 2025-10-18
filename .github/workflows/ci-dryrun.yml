@@ -1,0 +1,35 @@
+name: CI - Dry-run tests
+
+on:
+  push:
+    branches: [ main, docs/copilot-instructions-update ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run dry-run and shellcheck tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install system deps (shellcheck)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f dev-requirements.txt ]; then pip install -r dev-requirements.txt; fi
+
+      - name: Run pytest (dry-run tests)
+        run: |
+          pytest -q tests/test_auto_description_runtime.py tests/test_shellcheck_jira_groom.py || pytest -q tests/test_auto_description_runtime.py

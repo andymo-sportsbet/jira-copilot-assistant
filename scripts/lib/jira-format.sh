@@ -46,6 +46,8 @@ print(json.dumps(result))
 
 markdown_to_jira_adf() {
     local markdown_text="$1"
+    echo "[DEBUG] markdown_to_jira_adf input markdown:" >&2
+    echo "$markdown_text" >&2
     local content='[]'
     local in_list=false
     local list_items='[]'
@@ -127,5 +129,9 @@ markdown_to_jira_adf() {
         content=$(echo "$content" | jq --argjson items "$list_items" '. += [{"type":"bulletList","content":$items}]')
     fi
 
-    jq -n --argjson content "$content" '{type:"doc",version:1,content:$content}'
+    local adf_output
+    adf_output=$(jq -n --argjson content "$content" '{type:"doc",version:1,content:$content}')
+    echo "[DEBUG] markdown_to_jira_adf output ADF:" >&2
+    echo "$adf_output" >&2
+    echo "$adf_output"
 }

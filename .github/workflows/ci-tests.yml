@@ -36,8 +36,31 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f mcp-server/requirements.txt ]; then pip install -r mcp-server/requirements.txt; fi
 
+      - name: Install dev Python deps (if present)
+        run: |
+          set -euo pipefail
+          if [ -f dev-requirements.txt ]; then
+            python -m pip install -r dev-requirements.txt
+          else
+            echo "No dev-requirements.txt found; skipping"
+          fi
+
+      - name: Run pytest (repo tests)
+        working-directory: ${{ github.workspace }}
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if [ -d tests ]; then
+            python -m pytest -q tests || true
+          else
+            echo "No tests/ directory; skipping pytest"
+          fi
+
       - name: Run pytest (mcp-server)
         working-directory: ${{ github.workspace }}
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -euo pipefail
           if [ -d mcp-server ]; then

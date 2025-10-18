@@ -61,6 +61,16 @@ main() {
     check_dependencies || exit 1
     
     # Parse arguments
+        # Load dry-run helper
+        # shellcheck disable=SC1091
+        source "$(dirname "${BASH_SOURCE[0]}")/lib/dryrun.sh"
+
+        parse_dry_run_arg "$@"
+
+        if is_dry_run; then
+            echo "Dry-run: would create JIRA ticket (no network calls)." >&2
+            exit 0
+        fi
     if ! parse_args "$@"; then
         [[ $? -eq 2 ]] && show_help && exit 0
         show_help

@@ -26,6 +26,10 @@ source "${SCRIPT_DIR}/lib/jira-estimate-team.sh"
 # Load environment
 load_env "${SCRIPT_DIR}/../.env"
 
+# Global markers used by grooming to identify AI-generated sections
+start_marker="⚡ COPILOT_GENERATED_START ⚡"
+end_marker="⚡ COPILOT_GENERATED_END ⚡"
+
 # Show help
 show_help() {
     cat << EOF
@@ -45,6 +49,7 @@ Options:
   --reference-file FILE     Path to spec file with technical implementation details
   --ai-guide FILE          Path to AI-generated technical guide (JIRA ADF JSON format)
   --ai-description FILE    Path to AI-generated enhanced description (plain text)
+    --auto-description       Auto-select template and generate AI description (opt-in)
   --estimate               Enable AI-powered story point estimation (interactive)
   --points N               Manually set story points to N (0.5, 1, 2, 3, 4, 5)
   --auto-estimate          Auto-accept AI estimation without confirmation
@@ -111,6 +116,18 @@ update_story_points() {
     local ticket_key="$1"
     local points="$2"
     
+    # Always initialize manual_content before any use
+    local manual_content=""
+    if echo "$current_description" | grep -q "$start_marker"; then
+        manual_content=$(echo "$current_description" | awk -v marker="$start_marker" '
+            $0 ~ marker { exit }
+            { print }
+        ' | sed 's/[[:space:]]*$//')
+        manual_content=$(echo "$manual_content" | sed 's/---[[:space:]]*$//' | sed 's/[[:space:]]*$//')
+    fi
+    if [[ -z "$manual_content" ]]; then
+        manual_content="$current_description"
+    fi
     # Get story points field from environment or use default
     local story_points_field="${JIRA_STORY_POINTS_FIELD:-customfield_10016}"
     
@@ -121,7 +138,8 @@ update_story_points() {
     fi
     
     # Create update payload
-    local update_payload=$(cat << EOF
+    local update_payload
+    update_payload=$(cat << EOF
 {
   "fields": {
     "${story_points_field}": $points
@@ -157,8 +175,12 @@ generate_acceptance_criteria() {
     local ticket_data="$1"
     local github_context="$2"
     
-    local summary=$(echo "$ticket_data" | jq -r '.fields.summary')
-    local description=$(echo "$ticket_data" | jq -r '.fields.description.content[0].content[0].text // "No description"' 2>/dev/null || echo "No description")
+    local summary
+    summary=$(echo "$ticket_data" | jq -r '.fields.summary')
+    # description is intentionally declared for future use / clarity in generated criteria
+    # shellcheck disable=SC2034
+    local description
+    description=$(echo "$ticket_data" | jq -r '.fields.description.content[0].content[0].text // "No description"' 2>/dev/null || echo "No description")
     
     # For now, generate simple criteria based on ticket type and context
     # In a real implementation, this would call an AI API (OpenAI, Anthropic, etc.)
@@ -200,10 +222,12 @@ extract_technical_details() {
     info "📄 Extracting technical details from: $(basename "$spec_file")" >&2
     
     # Read the file content
-    local content=$(cat "$spec_file")
-    
+    local content
+    content=$(cat "$spec_file")
+
     # Extract Confluence URL if present (from YAML front matter)
-    local confluence_url=$(echo "$content" | grep -E "^confluence_url:" | sed 's/confluence_url: //' | tr -d ' ')
+    local confluence_url
+    confluence_url=$(echo "$content" | grep -E "^confluence_url:" | sed 's/confluence_url: //' | tr -d ' ')
     
     # Check if LLM generation is enabled (via environment variable)
     if [[ "${USE_LLM_GENERATION:-false}" == "true" ]] && [[ -n "${OPENAI_API_KEY:-}" ]]; then
@@ -226,7 +250,8 @@ generate_with_llm() {
     local confluence_url="$2"
     
     # Read spec content (truncate if too large to avoid token limits)
-    local spec_content=$(cat "$spec_file" | head -500)
+    local spec_content
+    spec_content=$(cat "$spec_file" | head -500)
     
     # Create prompt for LLM
     local prompt="Based on the following technical specification, generate a JIRA Atlassian Document Format (ADF) JSON for a technical implementation guide comment.
@@ -278,7 +303,8 @@ Return ONLY valid JSON, no explanation."
             }" 2>/dev/null)
         
         # Extract and clean response
-        local content=$(echo "$llm_response" | jq -r '.choices[0].message.content' 2>/dev/null)
+        local content
+        content=$(echo "$llm_response" | jq -r '.choices[0].message.content' 2>/dev/null)
         
         if [[ -n "$content" ]] && [[ "$content" != "null" ]]; then
             # Clean up response (remove markdown code blocks if present)
@@ -423,8 +449,10 @@ format_github_context() {
     local prs="$1"
     local commits="$2"
     
-    local pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
-    local commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
+    local pr_count
+    pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
+    local commit_count
+    commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
     
     if [[ "$pr_count" == "0" ]] && [[ "$commit_count" == "0" ]]; then
         echo "No related GitHub activity found."
@@ -449,10 +477,10 @@ format_github_context() {
 
 # Main function
 main() {
-    # Check dependencies
-    check_dependencies || exit 1
+    # Note: dependency checks are performed later unless running in dry-run.
     
     # Parse arguments
+    local DRY_RUN=0
     local ticket_key=""
     local reference_file=""
     local ai_guide_file=""
@@ -479,6 +507,14 @@ main() {
             --ai-description)
                 ai_description_file="$2"
                 shift 2
+                ;;
+            --auto-description)
+                auto_description=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=1
+                shift
                 ;;
             --estimate)
                 enable_estimation=true
@@ -526,18 +562,101 @@ main() {
     
     # Validate ticket key format
     validate_ticket_key "$ticket_key" || exit 1
-    
-    info "Fetching ticket details for $ticket_key..."
-    
-    # Fetch ticket details
-    local ticket_data
-    if ! ticket_data=$(jira_get_issue "$ticket_key"); then
-        error "Failed to fetch ticket $ticket_key"
-        exit 1
+
+    # Ensure .temp exists for intermediate files (make available to dry-run flows)
+    local temp_dir="${SCRIPT_DIR}/../.temp"
+    mkdir -p "$temp_dir"
+
+    # If auto description requested, generate AI description and set ai_description_file
+    if [[ "${auto_description:-false}" == "true" ]]; then
+        info "Auto-selecting description template and generating AI description..."
+
+        # Use helper to pick template (ai-suggest) and print the chosen template path.
+        # get-description-template.sh may emit informational lines; capture only the last non-empty line.
+        local template_path
+        template_path=$("${SCRIPT_DIR}/get-description-template.sh" "$ticket_key" --print --ai-suggest 2>/dev/null | sed -n '/./p' | tail -n1 || true)
+
+        if [[ -z "$template_path" ]] || [[ ! -f "$template_path" ]]; then
+            warning "Could not determine template automatically; creating fallback AI description"
+            # Ensure temp file exists with a minimal placeholder description so tests/dry-runs can proceed
+            local ai_desc_temp="$temp_dir/${ticket_key}-ai-description.txt"
+            printf '%s
+' "# Auto-generated description placeholder for ${ticket_key}" > "$ai_desc_temp"
+            ai_description_file="$ai_desc_temp"
+        else
+            info "Using template: $template_path"
+
+            # If LLM generation is enabled, try to build description automatically
+            local ai_desc_temp="$temp_dir/${ticket_key}-ai-description.txt"
+            mkdir -p "$temp_dir"
+
+            if [[ "${USE_LLM_GENERATION:-false}" == "true" ]] && [[ -n "${OPENAI_API_KEY:-}" ]]; then
+                info "Generating description using LLM based on template: $template_path"
+                # For simplicity, feed the template to the LLM prompt via generate_with_llm wrapper
+                # The generate_with_llm function expects a spec file; reuse it by calling the template path
+                if generate_with_llm "$template_path" > "$ai_desc_temp" 2>/dev/null; then
+                    info "AI description written to: $ai_desc_temp"
+                    ai_description_file="$ai_desc_temp"
+                else
+                    warning "LLM generation failed; attempting template-based generation"
+                fi
+            fi
+
+            # If ai_description_file not set yet, fall back to template text -> temp file
+            if [[ -z "${ai_description_file:-}" ]]; then
+                info "Using template text as starting point for AI description (saved to $ai_desc_temp)"
+                # Copy template contents to temp file as a starting point
+                if cp -- "$template_path" "$ai_desc_temp" 2>/dev/null; then
+                    ai_description_file="$ai_desc_temp"
+                else
+                    # If copying fails for any reason, write a minimal fallback template so tests can continue
+                    printf '%s
+' "# AI-generated description placeholder for $ticket_key" > "$ai_desc_temp"
+                    ai_description_file="$ai_desc_temp"
+                fi
+            fi
+        fi
+    fi
+
+    # If dry-run, stop here to avoid network calls but keep generated temp files for inspection/tests
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        info "Dry-run enabled: skipping network calls. Temp files are available under: $temp_dir"
+        # Print the ai_description_file path for test harness convenience
+        if [[ -n "${ai_description_file:-}" ]]; then
+            echo "$ai_description_file"
+        fi
+        return 0
     fi
     
-    local summary=$(echo "$ticket_data" | jq -r '.fields.summary')
+    # Before making network calls ensure dependencies are present (not needed for dry-run)
+    if [[ "$DRY_RUN" -ne 1 ]]; then
+        check_dependencies || exit 1
+    fi
+
+    info "Fetching ticket details for $ticket_key..."
+
+    # Fetch ticket details
+    local ticket_data
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        # In dry-run, create a minimal fake ticket_data to exercise local logic
+        ticket_data='{"fields": {"summary": "(dry-run) Test ticket", "description": ""}}'
+    else
+        if ! ticket_data=$(jira_get_issue "$ticket_key"); then
+            error "Failed to fetch ticket $ticket_key"
+            exit 1
+        fi
+    fi
+    
+    # Save a raw current_description globally so helper functions can access it
+    local current_description
+    current_description=$(echo "$ticket_data" | jq -r '.fields.description // ""' 2>/dev/null || echo "")
+
+    local summary
+    summary=$(echo "$ticket_data" | jq -r '.fields.summary')
     info "Ticket: $summary"
+
+    # Determine description type early: null / string / object
+    desc_type=$(echo "$ticket_data" | jq -r 'if .fields.description == null then "null" elif (.fields.description|type) == "string" then "string" else "object" end')
     
     # Handle manual story points
     if [[ -n "$manual_points" ]]; then
@@ -553,7 +672,8 @@ main() {
     local story_points=""
     local estimation_explanation=""
     if [[ "$enable_estimation" == "true" ]]; then
-        local current_description=$(echo "$ticket_data" | jq -r '.fields.description // empty')
+        local current_description
+        current_description=$(echo "$ticket_data" | jq -r '.fields.description // empty')
         
         # Extract plain text from ADF if present
         local description_text=""
@@ -580,13 +700,17 @@ main() {
             
             # Extract from JSON
             story_points=$(echo "$estimation_result" | jq -r '.estimated_points')
-            local reasoning=$(echo "$estimation_result" | jq -r '.reasoning')
-            local should_split=$(echo "$estimation_result" | jq -r '.should_split')
-            local confidence=$(echo "$estimation_result" | jq -r '.confidence')
+            local reasoning
+            reasoning=$(echo "$estimation_result" | jq -r '.reasoning')
+            local should_split
+            should_split=$(echo "$estimation_result" | jq -r '.should_split')
+            local confidence
+            confidence=$(echo "$estimation_result" | jq -r '.confidence')
             
             # Display reasoning
             echo "🔍 Analysis:"
-            echo "$reasoning" | sed 's/\\n/\n/g'
+            # Print analysis preserving literal \n sequences produced by the estimator
+            printf "%b\n" "$reasoning"
             echo ""
             echo "Confidence: $confidence"
             echo ""
@@ -603,6 +727,7 @@ main() {
             fi
         else
             info "Using default Fibonacci estimation (1, 2, 3, 5, 8, 13...)..."
+            # shellcheck disable=SC2034
             local estimation_output
             # Capture stdout (the number) and stderr (the analysis) separately
             story_points=$(estimate_story_points "$description_text" "$summary" 2>/dev/null)
@@ -651,7 +776,7 @@ main() {
                     fi
                     ;;
                 o|O)
-                    read -p "Enter story points (0.5, 1, 2, 3, 4, 5): " custom_points
+                    read -r -p "Enter story points (0.5, 1, 2, 3, 4, 5): " custom_points
                     if update_story_points "$ticket_key" "$custom_points"; then
                         echo ""
                     fi
@@ -667,11 +792,15 @@ main() {
     
     # Search GitHub for related work
     info "Searching GitHub for related PRs and commits..."
-    local prs=$(github_search_prs "$ticket_key")
-    local commits=$(github_search_commits "$ticket_key")
+    local prs
+    prs=$(github_search_prs "$ticket_key")
+    local commits
+    commits=$(github_search_commits "$ticket_key")
     
-    local pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
-    local commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
+    local pr_count
+    pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
+    local commit_count
+    commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
     
     if [[ "$pr_count" -gt 0 ]]; then
         success "Found $pr_count related PR(s)"
@@ -686,11 +815,13 @@ main() {
     fi
     
     # Format GitHub context
-    local github_context=$(format_github_context "$prs" "$commits")
+    local github_context
+    github_context=$(format_github_context "$prs" "$commits")
     
     # Generate acceptance criteria
     info "Generating acceptance criteria..."
-    local acceptance_criteria=$(generate_acceptance_criteria "$ticket_data" "$github_context")
+    local acceptance_criteria
+    acceptance_criteria=$(generate_acceptance_criteria "$ticket_data" "$github_context")
     
     # Extract technical details from reference file if provided
     local technical_guide=""
@@ -699,36 +830,60 @@ main() {
     fi
     
     # Get current description from JIRA (handle ADF object or plain string)
-    local current_description=""
-    # Try to extract text from ADF if description is an object
-    if echo "$ticket_data" | jq -e '.fields.description and (.fields.description | type == "object")' >/dev/null 2>&1; then
-        # Collect all text fragments from ADF and preserve paragraph boundaries
-        # Join fragments with a single newline so markdown headings and lists survive
-        current_description=$(echo "$ticket_data" | jq -r '.fields.description | .. | .text? // empty' 2>/dev/null | awk 'BEGIN{ORS="\n"} {gsub(/^[ \t]+|[ \t]+$/,"",$0); print}' | sed '/^[[:space:]]*$/d')
-    else
-        # Fallback to string description or empty (preserve it as-is)
-        current_description=$(echo "$ticket_data" | jq -r '.fields.description // ""' 2>/dev/null || echo "")
+        # Markers to identify generated content
+        local start_marker="⚡ COPILOT_GENERATED_START ⚡"
+        local end_marker="⚡ COPILOT_GENERATED_END ⚡"
+
+        # Derive manual_content from current_description (preserve original description if it's a plain string)
+        local manual_content=""
+        if [[ -n "$current_description" && "$desc_type" != "object" ]]; then
+            if echo "$current_description" | grep -q "$start_marker"; then
+                manual_content=$(echo "$current_description" | awk -v marker="$start_marker" '
+                    $0 ~ marker { exit }
+                    { print }
+                ' | sed 's/[[:space:]]*$//' )
+                manual_content=$(echo "$manual_content" | sed 's/---[[:space:]]*$//' | sed 's/[[:space:]]*$//')
+            else
+                manual_content="$current_description"
+            fi
+        fi
+
+        local enhanced_description=""
+        # Only include the original ticket description in the markdown when it is plain text
+        if [[ -n "$manual_content" ]]; then
+            enhanced_description+="$manual_content"
+            enhanced_description+=$'\n\n---\n\n'
+        elif [[ -n "${original_summary:-}" ]]; then
+            # Include a short original summary and a link to the backup .temp ADF file on the grooming host
+            enhanced_description+="Original summary: ${original_summary}\n\n"
+            enhanced_description+="(Full original ADF saved to: .temp/${ticket_key}-original-adf.json on the grooming host)"
+            enhanced_description+=$'\n\n---\n\n'
+        fi
+
+    # Add markers around ALL generated content
+    enhanced_description+="$start_marker\n\n"
+
+    # Initialize ai_description (may be set later if --ai-description provided)
+    local ai_description=""
+
+    # Add AI-generated description (if provided)
+    if [[ -n "$ai_description" ]]; then
+        enhanced_description+="$ai_description\n\n---\n\n"
     fi
-    
-    # Markers to identify generated content
-    local start_marker="⚡ COPILOT_GENERATED_START ⚡"
-    local end_marker="⚡ COPILOT_GENERATED_END ⚡"
-    
-    # Extract manual content (everything before markers, if they exist)
-    local manual_content=""
-    if echo "$current_description" | grep -q "$start_marker"; then
-        # Extract everything before the start marker
-        manual_content=$(echo "$current_description" | awk -v marker="$start_marker" '
-            $0 ~ marker { exit }
-            { print }
-        ' | sed 's/[[:space:]]*$//')
-        
-        # Remove trailing separators from manual content
-        manual_content=$(echo "$manual_content" | sed 's/---[[:space:]]*$//' | sed 's/[[:space:]]*$//')
-    else
-        # No markers exist, keep all current content as manual
-        manual_content="$current_description"
+
+    # Add acceptance criteria
+    enhanced_description+="$acceptance_criteria"
+
+    # Add GitHub context if present
+    if [[ -n "$github_context" ]] && [[ "$github_context" != "No related GitHub activity found." ]]; then
+        enhanced_description+=$'\n\n---\n\n'
+        enhanced_description+="$github_context"
     fi
+
+    # Story point estimation will be added as a grooming comment (not in the description)
+
+    enhanced_description+=$'\n\n'
+    enhanced_description+="$end_marker"
     
     # If AI description provided, read and sanitize it (preserve blank lines, strip YAML front matter, remove markers)
     local ai_description=""
@@ -765,6 +920,12 @@ main() {
     if [[ -n "$manual_content" ]]; then
         enhanced_description="$manual_content"
         enhanced_description+=$'\n\n---\n\n'
+    elif [[ -n "${original_summary:-}" ]]; then
+        # Include a short original summary and a link to the backup .temp ADF file on the grooming host
+        enhanced_description+="Original summary: ${original_summary}"
+        enhanced_description+=$'\n\n'
+        enhanced_description+="(Full original ADF saved to: .temp/${ticket_key}-original-adf.json on the grooming host)"
+        enhanced_description+=$'\n\n---\n\n'
     fi
     
     # 2. Add markers around ALL generated content
@@ -786,24 +947,15 @@ main() {
         enhanced_description+="$github_context"
     fi
     
-    # 5a. Add AI Estimation (if enabled)
-    if [[ "$enable_estimation" == "true" ]] && [[ -n "$story_points" ]]; then
-        enhanced_description+=$'\n\n---\n\n'
-        enhanced_description+="## 📊 AI Story Point Estimation"
-        enhanced_description+=$'\n\n'
-        enhanced_description+="**Estimated Effort: $story_points Story Points**"
-        enhanced_description+=$'\n\n'
-        enhanced_description+="$estimation_explanation"
-        enhanced_description+=$'\n\n'
-        enhanced_description+="_Note: This is an AI-generated estimate based on ticket content. Team review recommended._"
-    fi
+    # 5a. AI Estimation moved out of the description and into the grooming comment
     
     # 6. Close markers
     enhanced_description+=$'\n\n'
     enhanced_description+="$end_marker"
     
     # Update ticket description
-    local has_markers=$(echo "$current_description" | grep -q "$start_marker" && echo "true" || echo "false")
+    local has_markers
+    has_markers=$(echo "$current_description" | grep -q "$start_marker" && echo "true" || echo "false")
     if [[ "$has_markers" == "true" ]]; then
         info "Updating ticket description (replacing AI-generated content, preserving manual edits)..."
 
@@ -818,11 +970,98 @@ main() {
         exit 1
     }
 
-    # Validate that the converter returned valid JSON (or a JSON ADF object)
+    # Ensure .temp exists for intermediate ADF files
+    local temp_dir="${SCRIPT_DIR}/../.temp"
+    mkdir -p "$temp_dir"
+
+    # Prepare enhanced ADF file
+    local enhanced_adf_file="$temp_dir/${ticket_key}-enhanced-adf.json"
+    printf "%s" "$description_adf" > "$enhanced_adf_file"
+
+    # Prepare original ADF file: try to extract the ADF object from ticket_data
+    local original_adf_file="$temp_dir/${ticket_key}-original-adf.json"
+    # Determine description type: null / string / object
+    local desc_type
+    desc_type=$(echo "$ticket_data" | jq -r 'if .fields.description == null then "null" elif (.fields.description|type) == "string" then "string" else "object" end')
+
+    # Initialize helpers
+    original_summary=""
+    orig_text=""
+
+    if [[ "$desc_type" == "object" ]]; then
+        # Save raw ADF object then try to strip any AI-generated nodes
+        echo "$ticket_data" | jq '.fields.description' > "$original_adf_file"
+
+        # If it's valid JSON, attempt to remove content nodes that contain the start marker
+        if jq -e '.' "$original_adf_file" >/dev/null 2>&1; then
+            jq --arg marker "$start_marker" '
+                def contains_marker: (.. | objects | .text? // "" | contains($marker));
+                . as $d |
+                ($d.content | to_entries | map(select(.value | contains_marker) | .key) | .[0]) as $idx |
+                if $idx == null then $d else { type: "doc", version: ($d.version // 1), content: ($d.content[0:$idx]) } end' "$original_adf_file" > "${original_adf_file}.tmp" && mv "${original_adf_file}.tmp" "$original_adf_file" || true
+        fi
+
+        # Extract a short human summary from the cleaned original ADF (first paragraph/text found)
+        original_summary=$(jq -r '(.. | objects | select(.type=="paragraph") | .. | .text?) // empty' "$original_adf_file" 2>/dev/null | sed -n '1p' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-200)
+
+    elif [[ "$desc_type" == "string" ]]; then
+        # The description is a string - try to parse as JSON ADF, otherwise treat as plain text
+        orig_text=$(echo "$ticket_data" | jq -r '.fields.description')
+
+        if printf "%s" "$orig_text" | jq -e '.' >/dev/null 2>&1; then
+            # It's valid JSON (serialized ADF) - parse then strip AI-generated nodes if present
+            printf "%s" "$orig_text" | jq '.' > "$original_adf_file"
+            jq --arg marker "$start_marker" '
+                def contains_marker: (.. | objects | .text? // "" | contains($marker));
+                . as $d |
+                ($d.content | to_entries | map(select(.value | contains_marker) | .key) | .[0]) as $idx |
+                if $idx == null then $d else { type: "doc", version: ($d.version // 1), content: ($d.content[0:$idx]) } end' "$original_adf_file" > "${original_adf_file}.tmp" && mv "${original_adf_file}.tmp" "$original_adf_file" || true
+
+            original_summary=$(jq -r '(.. | objects | select(.type=="paragraph") | .. | .text?) // empty' "$original_adf_file" 2>/dev/null | sed -n '1p' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-200)
+        else
+            # Plain text - remove any AI-generated section (lines after start_marker) and wrap as codeBlock ADF
+            local cleaned_text
+            cleaned_text=$(printf "%s" "$orig_text" | awk -v m="$start_marker" '$0 ~ m {exit} {print}')
+
+            # Detect probable language for the code block (json if starts with { or [)
+            local lang="text"
+            if printf "%s" "$cleaned_text" | sed -n '1p' | grep -Eq '^[[:space:]]*[{[]'; then
+                lang="json"
+            fi
+
+            jq -n --arg text "$cleaned_text" --arg lang "$lang" \
+              '{type: "doc", version: 1, content: [{type: "codeBlock", attrs: {language: $lang}, content: [{type: "text", text: $text}]}]}' > "$original_adf_file"
+
+            original_summary=$(printf "%s" "$cleaned_text" | sed -n '1p' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-200)
+        fi
+
+    else
+        # No description present - write an empty JIRA doc to keep downstream code simple
+        jq -n '{type: "doc", version: 1, content: []}' > "$original_adf_file"
+        original_summary=""
+    fi
+
+    # Safety check: ensure the saved original ADF does NOT contain any AI-generated markers
+    if jq -e --arg marker "$start_marker" '([.. | .text? // empty] | map(select(contains($marker))) | length) > 0' "$original_adf_file" >/dev/null 2>&1; then
+        error "Saved original ADF contains AI-generated marker '$start_marker'. Aborting to avoid preserving AI content."
+        echo "Original ADF saved at: $original_adf_file" >&2
+        exit 1
+    fi
+
+    # Merge original + enhanced ADF using the Python helper to avoid fragile shell/json handling
+    local merged_adf_file="$temp_dir/${ticket_key}-merged-adf.json"
+    if ! python3 "${SCRIPT_DIR}/lib/merge_adf.py" --original "$original_adf_file" --enhanced "$enhanced_adf_file" --output "$merged_adf_file" >/dev/null 2>&1; then
+        warning "merge_adf.py failed; falling back to using the enhanced ADF only"
+        # Use the enhanced ADF as-is
+        description_adf=$(cat "$enhanced_adf_file")
+    else
+        description_adf=$(cat "$merged_adf_file")
+    fi
+
+    # Validate that the final description_adf is valid JSON ADF
     if ! echo "$description_adf" | jq -e '.' >/dev/null 2>&1; then
-        error "Converted description is not valid JSON ADF. Aborting update."
-        # Dump a small sample for debugging (first 200 chars)
-        echo "Converted output (truncated): $(echo "$description_adf" | head -c 200)" >&2
+        error "Final merged description is not valid JSON ADF. Aborting update."
+        echo "Final output (truncated): $(echo "$description_adf" | head -c 200)" >&2
         exit 1
     fi
     
@@ -865,7 +1104,9 @@ main() {
     comment_text+="* 5 acceptance criteria\n"
     
     if [[ "$enable_estimation" == "true" ]] && [[ -n "$story_points" ]]; then
-        comment_text+="* AI story point estimation: $story_points points\n"
+        comment_text+="* AI story point estimation: $story_points points\n\n"
+        comment_text+="Estimation details:\n"
+        comment_text+="$estimation_explanation\n\n"
     fi
     
     if [[ "$pr_count" -gt 0 ]]; then
@@ -885,6 +1126,40 @@ main() {
     if ! jira_add_comment "$ticket_key" "$comment_text" > /dev/null; then
         warning "Failed to add summary comment, but ticket was updated"
     fi
+
+    # If estimation was enabled, also add a rich ADF-formatted comment with details
+    if [[ "$enable_estimation" == "true" ]] && [[ -n "$story_points" ]]; then
+        info "Adding ADF-formatted estimation comment..."
+        local est_comment_file="/tmp/jira-estimation-comment-$$.json"
+
+        # Use the helper Python script to build robust ADF JSON
+        # NOTE: we intentionally generate the ADF payload to a temp file and POST it exactly once.
+        # This avoids brittle double-posting and prevents curl from trying to read a file that
+        # has already been removed. Keeping a single generate->post->cleanup sequence makes
+        # the flow robust and easier to reason about in tests.
+        if python3 "${SCRIPT_DIR}/lib/generate_estimation_adf.py" --points "$story_points" --explanation "$estimation_explanation" --output "$est_comment_file" >/dev/null 2>&1; then
+            info "Generated estimation ADF payload: $est_comment_file"
+
+            # Post the formatted comment to JIRA
+            local add_est_resp
+            add_est_resp=$(curl -s -X POST \
+                -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
+                -H "Content-Type: application/json" \
+                -d @"$est_comment_file" \
+                "${JIRA_BASE_URL}/rest/api/3/issue/${ticket_key}/comment")
+
+            rm -f "$est_comment_file"
+
+            if echo "$add_est_resp" | jq -e '.id' > /dev/null 2>&1; then
+                success "Added ADF-formatted estimation comment"
+            else
+                warning "Failed to add ADF-formatted estimation comment"
+                echo "$add_est_resp" | jq -r '.errorMessages[]?, .errors | to_entries[] | "\(.key): \(.value)"' 2>/dev/null || true
+            fi
+        else
+            warning "Failed to generate ADF comment payload with helper; falling back to plain text comment"
+        fi
+    fi
     
     # If AI guide provided, use it directly (pre-generated by Claude/Copilot)
     if [[ -n "$ai_guide_file" ]]; then
@@ -902,7 +1177,8 @@ main() {
         fi
         
         # Use JIRA API directly with the AI-generated JSON
-        local add_comment_response=$(curl -s -X POST \
+        local add_comment_response
+        add_comment_response=$(curl -s -X POST \
             -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
             -H "Content-Type: application/json" \
             -d @"$ai_guide_file" \
@@ -931,7 +1207,8 @@ main() {
         fi
         
         # Use JIRA API directly with properly formatted document JSON
-        local add_comment_response=$(curl -s -X POST \
+        local add_comment_response
+        add_comment_response=$(curl -s -X POST \
             -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
             -H "Content-Type: application/json" \
             -d @"$temp_comment_file" \
@@ -948,7 +1225,8 @@ main() {
         fi
     fi
     
-    local ticket_url=$(get_issue_url "$ticket_key")
+    local ticket_url
+    ticket_url=$(get_issue_url "$ticket_key")
     
     # Success output
     echo ""

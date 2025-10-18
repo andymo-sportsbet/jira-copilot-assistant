@@ -50,6 +50,7 @@ URL=""
 PAGE_ID=""
 PROJECT="${JIRA_PROJECT:-}"
 PRIORITY=""
+DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -68,6 +69,10 @@ while [[ $# -gt 0 ]]; do
         --priority)
             PRIORITY="$2"
             shift 2
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
             ;;
         --help)
             show_help
@@ -118,6 +123,41 @@ if [ -z "$PROJECT" ]; then
     echo ""
     show_help
     exit 1
+fi
+
+# If dry-run, skip network authentication and show intended actions
+if [ "$DRY_RUN" -eq 1 ]; then
+    info "Dry-run: skipping Confluence and JIRA network calls. Showing what would be created..."
+
+    # Ensure .temp exists and write a small artifact that tests/CI can inspect
+    TEMP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.temp"
+    mkdir -p "$TEMP_DIR"
+
+    # Build minimal placeholders (we haven't fetched the Confluence page)
+    local_title="Confluence page ${PAGE_ID:-<unknown>}"
+    local_description="Content would be fetched from Confluence page: ${PAGE_ID:-<unknown>} (${URL:-<no-url>})"
+    local_features=""
+
+    echo "Project: $PROJECT"
+    echo "Title: $local_title"
+    echo "Description preview: ${local_description:0:200}"
+    echo "Features: ${local_features:-<none>}"
+    echo "Priority: ${PRIORITY:-Medium}"
+
+    # Write a small JSON artifact for tests to assert on
+    cat > "$TEMP_DIR/${PAGE_ID:-dryrun}-confluence-to-jira.json" <<EOF
+{
+  "project": "$PROJECT",
+  "title": "$local_title",
+  "description": "${local_description}",
+  "features": "${local_features}",
+  "priority": "${PRIORITY:-Medium}",
+  "url": "${URL:-}"
+}
+EOF
+
+    echo "Dry-run artifact written: $TEMP_DIR/${PAGE_ID:-dryrun}-confluence-to-jira.json"
+    exit 0
 fi
 
 # Check authentication
