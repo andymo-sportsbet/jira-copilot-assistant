@@ -137,7 +137,8 @@ update_story_points() {
     fi
     
     # Create update payload
-    local update_payload=$(cat << EOF
+    local update_payload
+    update_payload=$(cat << EOF
 {
   "fields": {
     "${story_points_field}": $points
@@ -173,8 +174,11 @@ generate_acceptance_criteria() {
     local ticket_data="$1"
     local github_context="$2"
     
-    local summary=$(echo "$ticket_data" | jq -r '.fields.summary')
-    local description=$(echo "$ticket_data" | jq -r '.fields.description.content[0].content[0].text // "No description"' 2>/dev/null || echo "No description")
+    local summary
+    summary=$(echo "$ticket_data" | jq -r '.fields.summary')
+    # shellcheck disable=SC2034
+    local description
+    description=$(echo "$ticket_data" | jq -r '.fields.description.content[0].content[0].text // "No description"' 2>/dev/null || echo "No description")
     
     # For now, generate simple criteria based on ticket type and context
     # In a real implementation, this would call an AI API (OpenAI, Anthropic, etc.)
@@ -216,10 +220,12 @@ extract_technical_details() {
     info "📄 Extracting technical details from: $(basename "$spec_file")" >&2
     
     # Read the file content
-    local content=$(cat "$spec_file")
-    
+    local content
+    content=$(cat "$spec_file")
+
     # Extract Confluence URL if present (from YAML front matter)
-    local confluence_url=$(echo "$content" | grep -E "^confluence_url:" | sed 's/confluence_url: //' | tr -d ' ')
+    local confluence_url
+    confluence_url=$(echo "$content" | grep -E "^confluence_url:" | sed 's/confluence_url: //' | tr -d ' ')
     
     # Check if LLM generation is enabled (via environment variable)
     if [[ "${USE_LLM_GENERATION:-false}" == "true" ]] && [[ -n "${OPENAI_API_KEY:-}" ]]; then
@@ -242,7 +248,8 @@ generate_with_llm() {
     local confluence_url="$2"
     
     # Read spec content (truncate if too large to avoid token limits)
-    local spec_content=$(cat "$spec_file" | head -500)
+    local spec_content
+    spec_content=$(cat "$spec_file" | head -500)
     
     # Create prompt for LLM
     local prompt="Based on the following technical specification, generate a JIRA Atlassian Document Format (ADF) JSON for a technical implementation guide comment.
@@ -294,7 +301,8 @@ Return ONLY valid JSON, no explanation."
             }" 2>/dev/null)
         
         # Extract and clean response
-        local content=$(echo "$llm_response" | jq -r '.choices[0].message.content' 2>/dev/null)
+        local content
+        content=$(echo "$llm_response" | jq -r '.choices[0].message.content' 2>/dev/null)
         
         if [[ -n "$content" ]] && [[ "$content" != "null" ]]; then
             # Clean up response (remove markdown code blocks if present)
@@ -439,8 +447,10 @@ format_github_context() {
     local prs="$1"
     local commits="$2"
     
-    local pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
-    local commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
+    local pr_count
+    pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
+    local commit_count
+    commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
     
     if [[ "$pr_count" == "0" ]] && [[ "$commit_count" == "0" ]]; then
         echo "No related GitHub activity found."
@@ -553,9 +563,11 @@ main() {
     fi
     
     # Save a raw current_description globally so helper functions can access it
+    local current_description
     current_description=$(echo "$ticket_data" | jq -r '.fields.description // ""' 2>/dev/null || echo "")
 
-    local summary=$(echo "$ticket_data" | jq -r '.fields.summary')
+    local summary
+    summary=$(echo "$ticket_data" | jq -r '.fields.summary')
     info "Ticket: $summary"
 
     # Determine description type early: null / string / object
@@ -575,7 +587,8 @@ main() {
     local story_points=""
     local estimation_explanation=""
     if [[ "$enable_estimation" == "true" ]]; then
-        local current_description=$(echo "$ticket_data" | jq -r '.fields.description // empty')
+        local current_description
+        current_description=$(echo "$ticket_data" | jq -r '.fields.description // empty')
         
         # Extract plain text from ADF if present
         local description_text=""
@@ -602,9 +615,12 @@ main() {
             
             # Extract from JSON
             story_points=$(echo "$estimation_result" | jq -r '.estimated_points')
-            local reasoning=$(echo "$estimation_result" | jq -r '.reasoning')
-            local should_split=$(echo "$estimation_result" | jq -r '.should_split')
-            local confidence=$(echo "$estimation_result" | jq -r '.confidence')
+            local reasoning
+            reasoning=$(echo "$estimation_result" | jq -r '.reasoning')
+            local should_split
+            should_split=$(echo "$estimation_result" | jq -r '.should_split')
+            local confidence
+            confidence=$(echo "$estimation_result" | jq -r '.confidence')
             
             # Display reasoning
             echo "🔍 Analysis:"
@@ -625,6 +641,7 @@ main() {
             fi
         else
             info "Using default Fibonacci estimation (1, 2, 3, 5, 8, 13...)..."
+            # shellcheck disable=SC2034
             local estimation_output
             # Capture stdout (the number) and stderr (the analysis) separately
             story_points=$(estimate_story_points "$description_text" "$summary" 2>/dev/null)
@@ -689,8 +706,10 @@ main() {
     
     # Search GitHub for related work
     info "Searching GitHub for related PRs and commits..."
-    local prs=$(github_search_prs "$ticket_key")
-    local commits=$(github_search_commits "$ticket_key")
+    local prs
+    prs=$(github_search_prs "$ticket_key")
+    local commits
+    commits=$(github_search_commits "$ticket_key")
     
     local pr_count=$(echo "$prs" | jq 'length' 2>/dev/null || echo "0")
     local commit_count=$(echo "$commits" | jq 'length' 2>/dev/null || echo "0")
@@ -708,11 +727,13 @@ main() {
     fi
     
     # Format GitHub context
-    local github_context=$(format_github_context "$prs" "$commits")
+    local github_context
+    github_context=$(format_github_context "$prs" "$commits")
     
     # Generate acceptance criteria
     info "Generating acceptance criteria..."
-    local acceptance_criteria=$(generate_acceptance_criteria "$ticket_data" "$github_context")
+    local acceptance_criteria
+    acceptance_criteria=$(generate_acceptance_criteria "$ticket_data" "$github_context")
     
     # Extract technical details from reference file if provided
     local technical_guide=""
@@ -845,7 +866,8 @@ main() {
     enhanced_description+="$end_marker"
     
     # Update ticket description
-    local has_markers=$(echo "$current_description" | grep -q "$start_marker" && echo "true" || echo "false")
+    local has_markers
+    has_markers=$(echo "$current_description" | grep -q "$start_marker" && echo "true" || echo "false")
     if [[ "$has_markers" == "true" ]]; then
         info "Updating ticket description (replacing AI-generated content, preserving manual edits)..."
 
@@ -1067,7 +1089,8 @@ main() {
         fi
         
         # Use JIRA API directly with the AI-generated JSON
-        local add_comment_response=$(curl -s -X POST \
+        local add_comment_response
+        add_comment_response=$(curl -s -X POST \
             -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
             -H "Content-Type: application/json" \
             -d @"$ai_guide_file" \
@@ -1096,7 +1119,8 @@ main() {
         fi
         
         # Use JIRA API directly with properly formatted document JSON
-        local add_comment_response=$(curl -s -X POST \
+        local add_comment_response
+        add_comment_response=$(curl -s -X POST \
             -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
             -H "Content-Type: application/json" \
             -d @"$temp_comment_file" \
@@ -1113,7 +1137,8 @@ main() {
         fi
     fi
     
-    local ticket_url=$(get_issue_url "$ticket_key")
+    local ticket_url
+    ticket_url=$(get_issue_url "$ticket_key")
     
     # Success output
     echo ""
