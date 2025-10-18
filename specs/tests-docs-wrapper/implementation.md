@@ -5,7 +5,7 @@
 Job outline:
 - name: test
   runs-on: ubuntu-latest
-  strategy: matrix: python-version: [3.9,3.10,3.11]
+  strategy: matrix: python-version: ["3.9", "3.10", "3.11"]
   steps:
   - Checkout
   - Setup Python
